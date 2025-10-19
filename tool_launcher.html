@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACAD=GIS Tool Launcher</title>
+    
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Shared Styles -->
+    <link rel="stylesheet" href="shared/styles.css">
+    
+    <style>
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .tool-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+            border-color: rgba(59, 130, 246, 0.6);
+        }
+        
+        .tool-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .tool-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .tool-description {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .tool-badge {
+            display: inline-block;
+            margin-top: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .recent-activity {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+    </style>
+</head>
+<body class="grid-background">
+    <div id="root"></div>
+
+    <!-- Shared Components -->
+    <script src="shared/components.js"></script>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Tool Configuration
+        const TOOLS = [
+            {
+                id: 'project-manager',
+                name: 'Project Manager',
+                description: 'Create, edit, and manage projects. Organize your drawings and track project information.',
+                icon: 'folder-open',
+                url: 'tools/project_manager.html',
+                color: 'blue',
+                badge: 'Core'
+            },
+            {
+                id: 'drawing-browser',
+                name: 'Drawing Browser',
+                description: 'Search, filter, and browse all drawings. Quick access to view and manage drawing files.',
+                icon: 'search',
+                url: 'tools/drawing_browser.html',
+                color: 'green',
+                badge: 'Core'
+            },
+            {
+                id: 'map-viewer',
+                name: 'Map Viewer',
+                description: 'View georeferenced drawings on interactive maps with GIS layer overlays.',
+                icon: 'map',
+                url: 'tools/map_viewer.html',
+                color: 'purple',
+                badge: 'GIS'
+            },
+            {
+                id: 'drawing-importer',
+                name: 'Drawing Importer',
+                description: 'Upload and import DXF files. Configure georeferencing and process CAD drawings.',
+                icon: 'file-upload',
+                url: 'tools/drawing_importer.html',
+                color: 'orange',
+                badge: 'Import'
+            },
+            {
+                id: 'symbol-library',
+                name: 'Symbol Library',
+                description: 'Browse and manage block definitions. Preview SVG symbols and view metadata.',
+                icon: 'shapes',
+                url: 'tools/symbol_library.html',
+                color: 'red',
+                badge: 'Coming Soon'
+            }
+        ];
+
+        // Main App Component
+        function ToolLauncher() {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [recentActivity, setRecentActivity] = useState([]);
+
+            useEffect(() => {
+                loadData();
+            }, []);
+
+            const loadData = async () => {
+                try {
+                    const statsData = await api.get('/stats');
+                    setStats(statsData);
+                    
+                    // Generate recent activity from stats
+                    const activity = [];
+                    if (statsData.recent_drawings && statsData.recent_drawings.length > 0) {
+                        statsData.recent_drawings.slice(0, 3).forEach(drawing => {
+                            activity.push({
+                                icon: 'file-alt',
+                                color: 'green',
+                                text: `Drawing "${drawing.drawing_name}" created`,
+                                time: drawing.created_at
+                            });
+                        });
+                    }
+                    
+                    // Add system activity
+                    activity.push({
+                        icon: 'check-circle',
+                        color: 'blue',
+                        text: 'System initialized successfully',
+                        time: new Date().toISOString()
+                    });
+                    
+                    setRecentActivity(activity);
+                } catch (error) {
+                    console.error('Failed to load stats:', error);
+                    setStats({
+                        total_projects: 0,
+                        total_drawings: 0,
+                        total_symbols: 0,
+                        total_layers: 0
+                    });
+                }
+                setLoading(false);
+            };
+
+            const openTool = (url) => {
+                window.open(url, '_blank');
+            };
+
+            const getIconColorClass = (color) => {
+                const colors = {
+                    blue: { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' },
+                    green: { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981' },
+                    orange: { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b' },
+                    purple: { bg: 'rgba(168, 85, 247, 0.2)', text: '#a855f7' },
+                    red: { bg: 'rgba(239, 68, 68, 0.2)', text: '#ef4444' }
+                };
+                return colors[color];
+            };
+
+            const getBadgeColorClass = (badge) => {
+                const colors = {
+                    'Core': { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981', border: 'rgba(16, 185, 129, 0.3)' },
+                    'GIS': { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' },
+                    'Import': { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' },
+                    'Coming Soon': { bg: 'rgba(148, 163, 184, 0.2)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)' }
+                };
+                return colors[badge] || colors['Core'];
+            };
+
+            return (
+                <div className="page-wrapper">
+                    <Header 
+                        title="ACAD=GIS"
+                        subtitle="Tool Launcher • Mission Control"
+                    />
+
+                    <main className="main-content">
+                        <div className="container">
+                            {/* Welcome Section */}
+                            <div style={{ marginBottom: '3rem' }}>
+                                <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }} className="neon-blue">
+                                    Welcome to Mission Control
+                                </h2>
+                                <p style={{ color: 'var(--color-text-secondary)', fontSize: '1.125rem' }}>
+                                    Select a tool to begin working with your CAD and GIS data
+                                </p>
+                            </div>
+
+                            {/* Statistics */}
+                            {loading ? (
+                                <LoadingSpinner text="Loading statistics..." />
+                            ) : (
+                                <>
+                                    <div className="stats-grid">
+                                        <StatCard
+                                            icon="folder"
+                                            label="Total Projects"
+                                            value={stats?.total_projects || 0}
+                                            color="blue"
+                                        />
+                                        <StatCard
+                                            icon="file-alt"
+                                            label="Total Drawings"
+                                            value={stats?.total_drawings || 0}
+                                            color="green"
+                                        />
+                                        <StatCard
+                                            icon="shapes"
+                                            label="Symbols"
+                                            value={stats?.total_symbols || 0}
+                                            color="orange"
+                                        />
+                                        <StatCard
+                                            icon="layer-group"
+                                            label="Layer Standards"
+                                            value={stats?.total_layers || 0}
+                                            color="purple"
+                                        />
+                                    </div>
+
+                                    <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+                                        {/* Tools Grid */}
+                                        <div>
+                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+                                                Available Tools
+                                            </h3>
+                                            <div className="tool-grid">
+                                                {TOOLS.map(tool => {
+                                                    const iconColors = getIconColorClass(tool.color);
+                                                    const badgeColors = getBadgeColorClass(tool.badge);
+                                                    const isComingSoon = tool.badge === 'Coming Soon';
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={tool.id}
+                                                            className="tool-card"
+                                                            onClick={() => !isComingSoon && openTool(tool.url)}
+                                                            style={{ 
+                                                                opacity: isComingSoon ? 0.6 : 1,
+                                                                cursor: isComingSoon ? 'not-allowed' : 'pointer'
+                                                            }}
+                                                        >
+                                                            <div 
+                                                                className="tool-icon"
+                                                                style={{
+                                                                    background: iconColors.bg,
+                                                                    color: iconColors.text
+                                                                }}
+                                                            >
+                                                                <i className={`fas fa-${tool.icon}`}></i>
+                                                            </div>
+                                                            <div className="tool-title">{tool.name}</div>
+                                                            <div className="tool-description">{tool.description}</div>
+                                                            <span 
+                                                                className="tool-badge"
+                                                                style={{
+                                                                    background: badgeColors.bg,
+                                                                    color: badgeColors.text,
+                                                                    border: `1px solid ${badgeColors.border}`
+                                                                }}
+                                                            >
+                                                                {tool.badge}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Recent Activity */}
+                                        <div>
+                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+                                                Recent Activity
+                                            </h3>
+                                            <div className="recent-activity">
+                                                {recentActivity.length > 0 ? (
+                                                    recentActivity.map((activity, index) => {
+                                                        const iconColors = getIconColorClass(activity.color);
+                                                        return (
+                                                            <div key={index} className="activity-item">
+                                                                <div 
+                                                                    className="activity-icon"
+                                                                    style={{
+                                                                        background: iconColors.bg,
+                                                                        color: iconColors.text
+                                                                    }}
+                                                                >
+                                                                    <i className={`fas fa-${activity.icon}`}></i>
+                                                                </div>
+                                                                <div style={{ flex: 1 }}>
+                                                                    <div style={{ fontSize: '0.875rem' }}>
+                                                                        {activity.text}
+                                                                    </div>
+                                                                    <div style={{ 
+                                                                        fontSize: '0.75rem', 
+                                                                        color: 'var(--color-text-muted)',
+                                                                        marginTop: '0.25rem'
+                                                                    }}>
+                                                                        {formatDate(activity.time)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-secondary)' }}>
+                                                        <i className="fas fa-inbox" style={{ fontSize: '2rem', marginBottom: '0.5rem' }}></i>
+                                                        <p>No recent activity</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Quick Actions */}
+                                            <div style={{ marginTop: '1.5rem' }}>
+                                                <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
+                                                    Quick Actions
+                                                </h3>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                    <button 
+                                                        className="btn btn-primary"
+                                                        onClick={() => openTool('tools/project_manager.html')}
+                                                        style={{ justifyContent: 'flex-start' }}
+                                                    >
+                                                        <i className="fas fa-plus"></i>
+                                                        Create New Project
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={() => openTool('tools/drawing_importer.html')}
+                                                        style={{ justifyContent: 'flex-start' }}
+                                                    >
+                                                        <i className="fas fa-file-upload"></i>
+                                                        Import Drawing
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={() => openTool('tools/drawing_browser.html')}
+                                                        style={{ justifyContent: 'flex-start' }}
+                                                    >
+                                                        <i className="fas fa-search"></i>
+                                                        Browse Drawings
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Help Section */}
+                                    <div className="card" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                                            <i className="fas fa-info-circle" style={{ fontSize: '1.5rem', color: 'var(--color-accent-blue)' }}></i>
+                                            <div>
+                                                <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+                                                    Getting Started
+                                                </h3>
+                                                <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
+                                                    Welcome to ACAD=GIS! This tool launcher provides access to all system features. 
+                                                    Start by creating a project or importing drawings. Each tool opens in a new window 
+                                                    for easy multitasking.
+                                                </p>
+                                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                                    <button className="btn btn-ghost">
+                                                        <i className="fas fa-book"></i>
+                                                        View Documentation
+                                                    </button>
+                                                    <button className="btn btn-ghost" onClick={loadData}>
+                                                        <i className="fas fa-sync-alt"></i>
+                                                        Refresh Statistics
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </main>
+
+                    <Footer />
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ToolLauncher />);
+    </script>
+</body>
+</html>
