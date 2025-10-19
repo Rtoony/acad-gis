@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACAD=GIS Mission Control</title>
+    
+    <!-- React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet for Drawing Viewer -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Proj4js for coordinate transformation -->
+    <script src="https://unpkg.com/proj4@2.9.2/dist/proj4.js"></script>
+    
+    <!-- Esri Leaflet for ArcGIS services -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Rajdhani', sans-serif !important;
+            background: #0a0e27 !important;
+            color: #e0e7ff !important;
+        }
+        
+        .orbitron {
+            font-family: 'Orbitron', monospace;
+        }
+        
+        /* Animated Grid Background */
+        .min-h-screen {
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridScroll 20s linear infinite;
+            background-color: #0a0e27;
+        }
+        
+        @keyframes gridScroll {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 50px; }
+        }
+        
+        /* Neon Glow Effects */
+        .neon-blue {
+            text-shadow: 0 0 10px #3b82f6, 0 0 20px #3b82f6, 0 0 30px #3b82f6;
+        }
+        
+        .neon-cyan {
+            text-shadow: 0 0 10px #06b6d4, 0 0 20px #06b6d4;
+        }
+        
+        .neon-green {
+            text-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
+        }
+        
+        /* Override Tailwind Backgrounds */
+        .bg-white, .bg-gray-50, .bg-gray-100 {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%) !important;
+            border: 1px solid rgba(59, 130, 246, 0.3) !important;
+            backdrop-filter: blur(10px);
+        }
+        
+        .bg-gradient-to-r {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.3)) !important;
+            border-bottom: 2px solid rgba(59, 130, 246, 0.5) !important;
+        }
+        
+        /* Text Colors */
+        .text-gray-800, .text-gray-900, .text-gray-700, .text-gray-600 {
+            color: #e0e7ff !important;
+        }
+        
+        .text-blue-600, .text-blue-500 {
+            color: #3b82f6 !important;
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        
+        .text-green-600, .text-green-500 {
+            color: #10b981 !important;
+        }
+        
+        /* Cards and Panels */
+        .shadow-md, .shadow-lg {
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.2) !important;
+        }
+        
+        .rounded-lg {
+            border-radius: 12px;
+        }
+        
+        /* Buttons */
+        button {
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+        
+        /* Borders */
+        .border-gray-200, .border-gray-300 {
+            border-color: rgba(59, 130, 246, 0.2) !important;
+        }
+        
+        /* Input Backgrounds */
+        input[type="checkbox"] {
+            accent-color: #3b82f6;
+        }
+        
+        /* Layer Panel Specific */
+        .layer-panel {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 14, 39, 0.95) 100%) !important;
+            border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        /* Leaflet Popup Styling */
+        .leaflet-popup-content-wrapper {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 14, 39, 0.95) 100%);
+            color: #e0e7ff;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .leaflet-popup-tip {
+            background: rgba(15, 23, 42, 0.95);
+        }
+        
+        .entity-popup td {
+            color: #e0e7ff !important;
+        }
+        
+        .entity-popup td:first-child {
+            color: #94a3b8 !important;
+        }
+        
+        /* Status Indicators */
+        .bg-green-500 {
+            background: #10b981 !important;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        
+        .bg-red-500 {
+            background: #ef4444 !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+        
+        .bg-red-50 {
+            background: rgba(239, 68, 68, 0.1) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+        }
+        
+        .text-red-800, .text-red-700, .text-red-600 {
+            color: #fca5a5 !important;
+        }
+        
+        /* Drawing Map Background */
+        #drawing-map {
+            background: #1e293b !important;
+        }
+
+
+        /* Custom styles for drawing viewer */
+        .drawing-viewer-container {
+            height: calc(100vh - 240px);
+            position: relative;
+        }
+        
+        #drawing-map {
+            width: 100%;
+            height: 100%;
+            background: #f8f9fa;
+        }
+        
+        .layer-panel {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            max-height: calc(100% - 20px);
+            overflow-y: auto;
+            z-index: 1000;
+            width: 320px;
+        }
+        
+        .drawing-controls {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }
+        
+        .layer-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .layer-item:hover {
+            background: #f9fafb;
+        }
+        
+        .layer-color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 2px solid #333;
+            flex-shrink: 0;
+        }
+        
+        .basemap-option {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .basemap-option:hover {
+            background: #f9fafb;
+        }
+        
+        .basemap-option.active {
+            background: #dbeafe;
+            border-left: 3px solid #3b82f6;
+        }
+        
+        .leaflet-popup-content {
+            min-width: 200px;
+        }
+        
+        .entity-popup h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1f2937;
+        }
+        
+        .entity-popup table {
+            width: 100%;
+            font-size: 0.875rem;
+        }
+        
+        .entity-popup td {
+            padding: 4px 0;
+        }
+        
+        .entity-popup td:first-child {
+            font-weight: 500;
+            color: #6b7280;
+            padding-right: 12px;
+        }
+        
+        .svg-marker {
+            background: none;
+            border: none;
+        }
+        
+        /* Custom scrollbar for layer panel */
+        .layer-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .layer-panel::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        .layer-panel::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .layer-panel::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    
+        /* ============================================
+           MODAL STYLES
+           ============================================ */
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(10, 14, 39, 0.98) 100%);
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.3);
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .modal-body {
+            padding: 24px;
+        }
+        
+        .modal-footer {
+            padding: 24px;
+            border-top: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            color: #e0e7ff;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+        
+        .btn-secondary {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .alert-error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        // Wait for libraries and define projection
+        function waitForLibraries() {
+            return new Promise((resolve) => {
+                const check = () => {
+                    if (typeof proj4 !== 'undefined' && typeof L !== 'undefined') {
+                        proj4.defs("EPSG:2226", 
+                            "+proj=lcc +lat_0=37.66666666666666 +lon_0=-122 " +
+                            "+lat_1=39.83333333333334 +lat_2=38.33333333333334 " +
+                            "+x_0=2000000.0001016 +y_0=500000.0001016001 " +
+                            "+ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=us-ft +no_defs +type=crs"
+                        );
+                        resolve();
+                    } else {
+                        setTimeout(check, 100);
+                    }
+                };
+                check();
+            });
+        }
+        waitForLibraries();
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // API Configuration
+        const API_BASE_URL = 'http://localhost:8000/api';
+
+        // GIS Layer Registry Configuration
+        const GIS_LAYERS_CONFIG = {
+            parcels: {
+                id: 'sonoma_parcels_public',
+                name: 'Parcels',
+                url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/CRAPublic/ParcelsPublic/FeatureServer/0',
+                style: {
+                    color: '#ff7800',
+                    weight: 2,
+                    fillOpacity: 0.1,
+                    fillColor: '#ff7800'
+                },
+                popupFields: {
+                    title: 'Parcel Information',
+                    fields: [
+                        { label: 'APN', key: 'APN' },
+                        { label: 'Address', key: 'SITEADDRESS' },
+                        { label: 'Owner', key: 'OWNER' },
+                        { label: 'Acres', key: 'ACRES', format: (val) => val ? Number(val).toFixed(2) : 'N/A' }
+                    ]
+                }
+            },
+            roads: {
+                id: 'sonoma_roads',
+                name: 'Streets & Roads',
+                url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/TPWPublic/Streets_Roads/FeatureServer/0',
+                style: {
+                    color: '#2563eb',
+                    weight: 3,
+                    opacity: 0.8
+                },
+                popupFields: {
+                    title: 'Road Information',
+                    fields: [
+                        { label: 'Name', key: 'NAME' },
+                        { label: 'Type', key: 'TYPE' },
+                        { label: 'Class', key: 'CLASS' }
+                    ]
+                }
+            },
+            buildings: {
+                id: 'sonoma_buildings',
+                name: 'Buildings',
+                url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/BASEPublic/Buildings/FeatureServer/0',
+                style: {
+                    color: '#dc2626',
+                    weight: 1,
+                    fillOpacity: 0.3,
+                    fillColor: '#dc2626'
+                },
+                popupFields: {
+                    title: 'Building Information',
+                    fields: [
+                        { label: 'Type', key: 'BLDG_TYPE' },
+                        { label: 'Height', key: 'HEIGHT' },
+                        { label: 'Area', key: 'AREA', format: (val) => val ? Number(val).toFixed(0) + ' sq ft' : 'N/A' }
+                    ]
+                }
+            }
+        };
+
+        // Coordinate transformation
+        function cadToLatLon(x, y) {
+            try {
+                const result = proj4('EPSG:2226', 'EPSG:4326', [x, y]);
+                return { lat: result[1], lon: result[0] };
+            } catch (error) {
+                console.error('Transformation error:', error);
+                return null;
+            }
+        }
+
+        // API Helper Functions
+        const api = {
+            async get(endpoint) {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`);
+                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                return response.json();
+            },
+            
+            async post(endpoint, data) {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                return response.json();
+            }
+        };
+
+        // Main Dashboard Component
+        function Dashboard() {
+            const [activeTab, setActiveTab] = useState('overview');
+            const [projects, setProjects] = useState([]);
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [apiConnected, setApiConnected] = useState(false);
+
+            useEffect(() => {
+                checkApiConnection();
+            }, []);
+
+            const checkApiConnection = async () => {
+                try {
+                    await api.get('/health');
+                    setApiConnected(true);
+                    loadData();
+                } catch (error) {
+                    console.error('API Connection failed:', error);
+                    setApiConnected(false);
+                    setLoading(false);
+                }
+            };
+
+            const loadData = async () => {
+                setLoading(true);
+                try {
+                    const [projectsData, statsData] = await Promise.all([
+                        api.get('/projects'),
+                        api.get('/stats')
+                    ]);
+                    setProjects(projectsData);
+                    setStats(statsData);
+                } catch (error) {
+                    console.error('Failed to load data:', error);
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg">
+                        <div className="container mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                    <i className="fas fa-drafting-compass text-3xl"></i>
+                                    <div>
+                                        <h1 className="text-2xl font-bold orbitron neon-blue">ACAD=GIS</h1>
+                                        <p className="text-cyan-400 text-sm">MISSION CONTROL · Drawing Viewer</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                        apiConnected ? 'bg-green-500' : 'bg-red-500'
+                                    }`}>
+                                        {apiConnected ? '● API Connected' : '● API Offline'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Navigation Tabs */}
+                    <nav className="bg-white shadow-md">
+                        <div className="container mx-auto px-6">
+                            <div className="flex space-x-1">
+                                <TabButton icon="home" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
+                                    Overview
+                                </TabButton>
+                                <TabButton icon="folder" active={activeTab === 'projects'} onClick={() => setActiveTab('projects')}>
+                                    Projects
+                                </TabButton>
+                                <TabButton icon="map" active={activeTab === 'drawings'} onClick={() => setActiveTab('drawings')}>
+                                    Drawing Viewer
+                                </TabButton>
+                                <TabButton icon="shapes" active={activeTab === 'symbols'} onClick={() => setActiveTab('symbols')}>
+                                    Symbols
+                                </TabButton>
+                                <TabButton icon="exchange-alt" active={activeTab === 'import-export'} onClick={() => setActiveTab('import-export')}>
+                                    Import/Export
+                                </TabButton>
+                                <TabButton icon="stethoscope" active={activeTab === 'diagnostics'} onClick={() => setActiveTab('diagnostics')}>
+                                    Diagnostics
+                                </TabButton>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Main Content */}
+                    <main className="flex-1 container mx-auto px-6 py-8">
+                        {!apiConnected && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+                                <div className="flex items-center space-x-3">
+                                    <i className="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+                                    <div>
+                                        <h3 className="text-red-800 font-semibold">API Connection Failed</h3>
+                                        <p className="text-red-700">Make sure the API server is running on port 8000</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'overview' && <OverviewTab stats={stats} loading={loading} />}
+                        {activeTab === 'projects' && <ProjectsTab projects={projects} onRefresh={loadData} />}
+                        {activeTab === 'drawings' && <DrawingViewerTab />}
+                        {activeTab === 'symbols' && <SymbolsTab />}
+                        {activeTab === 'import-export' && <ImportExportTab />}
+                        {activeTab === 'diagnostics' && <DiagnosticsTab />}
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="bg-gray-800 text-gray-400 py-4">
+                        <div className="container mx-auto px-6 text-center text-sm">
+                            ACAD=GIS © 2025 • CAD Database Management System
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        // Tab Button Component
+        function TabButton({ icon, active, onClick, children }) {
+            return (
+                <button
+                    onClick={onClick}
+                    className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                        active 
+                            ? 'border-blue-500 text-blue-600' 
+                            : 'border-transparent text-gray-600 hover:text-blue-600'
+                    }`}
+                >
+                    <i className={`fas fa-${icon} mr-2`}></i>
+                    {children}
+                </button>
+            );
+        }
+
+        // Overview Tab
+        function OverviewTab({ stats, loading }) {
+            if (loading) {
+                return (
+                    <div className="text-center py-12">
+                        <i className="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-800">System Overview</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <StatCard
+                            icon="folder"
+                            label="Total Projects"
+                            value={stats?.total_projects || 0}
+                            color="blue"
+                        />
+                        <StatCard
+                            icon="file-alt"
+                            label="Total Drawings"
+                            value={stats?.total_drawings || 0}
+                            color="green"
+                        />
+                        <StatCard
+                            icon="layer-group"
+                            label="Layers"
+                            value={stats?.total_layers || 0}
+                            color="purple"
+                        />
+                        <StatCard
+                            icon="shapes"
+                            label="Symbols"
+                            value={stats?.total_symbols || 0}
+                            color="orange"
+                        />
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-xl font-semibold mb-4">Recent Activity</h3>
+                        <div className="space-y-3">
+                            <ActivityItem icon="check-circle" color="green">
+                                System initialized successfully
+                            </ActivityItem>
+                            <ActivityItem icon="database" color="blue">
+                                Database connection established
+                            </ActivityItem>
+                            <ActivityItem icon="map" color="purple">
+                                GIS features enabled (3 layers available)
+                            </ActivityItem>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Stat Card Component
+        function StatCard({ icon, label, value, color }) {
+            const colorClasses = {
+                blue: 'bg-blue-100 text-blue-600',
+                green: 'bg-green-100 text-green-600',
+                purple: 'bg-purple-100 text-purple-600',
+                orange: 'bg-orange-100 text-orange-600'
+            };
+
+            return (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-gray-600 text-sm">{label}</p>
+                            <p className="text-3xl font-bold text-gray-800 mt-1">{value}</p>
+                        </div>
+                        <div className={`w-12 h-12 rounded-lg ${colorClasses[color]} flex items-center justify-center`}>
+                            <i className={`fas fa-${icon} text-2xl`}></i>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Activity Item Component
+        function ActivityItem({ icon, color, children }) {
+            const colorClasses = {
+                green: 'text-green-500',
+                blue: 'text-blue-500',
+                purple: 'text-purple-500'
+            };
+
+            return (
+                <div className="flex items-center space-x-3">
+                    <i className={`fas fa-${icon} ${colorClasses[color]}`}></i>
+                    <span className="text-gray-700">{children}</span>
+                </div>
+            );
+        }
+
+        // Projects Tab Component
+        function ProjectsTab({ projects, onRefresh }) {
+            return (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-800">Projects</h2>
+                        <button
+                            onClick={onRefresh}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                            <i className="fas fa-sync-alt mr-2"></i>
+                            Refresh
+                        </button>
+                    </div>
+
+                    {projects.length === 0 ? (
+                        <div className="bg-gray-50 rounded-lg p-8 text-center">
+                            <i className="fas fa-folder-open text-4xl text-gray-400 mb-4"></i>
+                            <p className="text-gray-600">No projects found</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {projects.map(project => (
+                                <div
+                                    key={project.project_id}
+                                    className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                                >
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                                                {project.project_name}
+                                            </h3>
+                                            {project.project_number && (
+                                                <p className="text-sm text-gray-600">
+                                                    #{project.project_number}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <i className="fas fa-folder text-blue-500 text-2xl"></i>
+                                    </div>
+                                    {project.client_name && (
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            <i className="fas fa-user mr-2"></i>
+                                            {project.client_name}
+                                        </p>
+                                    )}
+                                    {project.description && (
+                                        <p className="text-sm text-gray-500 mt-3">
+                                            {project.description}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Drawing Viewer Tab Component
+        function DrawingViewerTab() {
+            const [drawings, setDrawings] = useState([]);
+            const [selectedDrawing, setSelectedDrawing] = useState(null);
+            const [drawingData, setDrawingData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [visibleLayers, setVisibleLayers] = useState({});
+            const [currentBasemap, setCurrentBasemap] = useState('streets');
+            const [gisLayersVisible, setGisLayersVisible] = useState({
+                parcels: false,
+                roads: false,
+                buildings: false
+            });
+            
+            const mapRef = useRef(null);
+            const leafletMap = useRef(null);
+            const layerGroups = useRef({});
+            const gisLayers = useRef({
+                parcels: null,
+                roads: null,
+                buildings: null
+            });
+            const basemapLayer = useRef(null);
+
+            useEffect(() => {
+                loadDrawings();
+            }, []);
+
+            const loadDrawings = async () => {
+                setLoading(true);
+                try {
+                    const data = await api.get('/drawings');
+                    setDrawings(data);
+                } catch (error) {
+                    console.error('Failed to load drawings:', error);
+                }
+                setLoading(false);
+            };
+
+            const selectDrawing = async (drawingId) => {
+                try {
+                    setLoading(true);
+                    setSelectedDrawing(drawingId);
+                    
+                    const data = await api.get(`/drawings/${drawingId}/render`);
+                    setDrawingData(data);
+                    
+                    const layerVisibility = {};
+                    data.layers.forEach(layer => {
+                        layerVisibility[layer.layer_name] = true;
+                    });
+                    setVisibleLayers(layerVisibility);
+                    
+                    setLoading(false);
+                    setTimeout(() => initializeMap(data), 100);
+                } catch (error) {
+                    console.error('Failed to load drawing:', error);
+                    alert('Failed to load drawing: ' + error.message);
+                    setLoading(false);
+                }
+            };
+
+            const initializeMap = (data) => {
+                if (!mapRef.current) return;
+                
+                if (leafletMap.current) {
+                    leafletMap.current.remove();
+                }
+
+                const isGeoreferenced = data.drawing.is_georeferenced;
+
+                if (isGeoreferenced) {
+                    initializeGeoMap(data);
+                } else {
+                    initializeCADMap(data);
+                }
+            };
+
+            const initializeGeoMap = (data) => {
+                const map = L.map(mapRef.current, {
+                    minZoom: 10,
+                    maxZoom: 22,
+                    zoomControl: true
+                });
+
+                addBasemap(map, currentBasemap);
+                const transformedBounds = renderDrawingGeoref(map, data);
+
+                if (transformedBounds) {
+                    map.fitBounds(transformedBounds, { padding: [50, 50] });
+                }
+
+                leafletMap.current = map;
+            };
+
+            const initializeCADMap = (data) => {
+                const bounds = data.bounds;
+                const mapBounds = [
+                    [bounds.min_y, bounds.min_x],
+                    [bounds.max_y, bounds.max_x]
+                ];
+
+                const map = L.map(mapRef.current, {
+                    crs: L.CRS.Simple,
+                    minZoom: -2,
+                    maxZoom: 4,
+                    zoomControl: true
+                });
+
+                map.fitBounds(mapBounds);
+                renderDrawing(map, data);
+                leafletMap.current = map;
+            };
+
+            const addBasemap = (map, basemapType) => {
+                if (basemapLayer.current) {
+                    map.removeLayer(basemapLayer.current);
+                }
+
+                let layer;
+                switch (basemapType) {
+                    case 'satellite':
+                        layer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Esri',
+                            maxZoom: 22
+                        });
+                        break;
+                    case 'topo':
+                        layer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenTopoMap',
+                            maxZoom: 17
+                        });
+                        break;
+                    case 'osm':
+                        layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '© OpenStreetMap',
+                            maxZoom: 19
+                        });
+                        break;
+                    case 'streets':
+                    default:
+                        layer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Esri',
+                            maxZoom: 22
+                        });
+                }
+
+                layer.addTo(map);
+                basemapLayer.current = layer;
+            };
+
+            const getColorFromIndex = (colorIndex) => {
+                const colors = {
+                    1: '#FF0000', 2: '#FFFF00', 3: '#00FF00', 4: '#00FFFF',
+                    5: '#0000FF', 6: '#FF00FF', 7: '#FFFFFF', 8: '#808080',
+                    9: '#C0C0C0', 10: '#FF0000', 11: '#FF8080', 12: '#CC0000'
+                };
+                return colors[colorIndex] || '#999999';
+            };
+
+            const renderDrawingGeoref = (map, data) => {
+                Object.values(layerGroups.current).forEach(group => group.remove());
+                layerGroups.current = {};
+
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLon = Infinity, maxLon = -Infinity;
+                let transformedCount = 0;
+
+                console.log('🔍 Rendering georeferenced drawing. Total inserts:', data.inserts.length);
+                
+                // Debug: Check first insert for SVG data
+                if (data.inserts.length > 0) {
+                    const firstInsert = data.inserts[0];
+                    console.log('📊 First insert sample:', {
+                        block_name: firstInsert.block_name,
+                        has_svg_content: !!firstInsert.svg_content,
+                        has_svg_viewbox: !!firstInsert.svg_viewbox,
+                        svg_viewbox: firstInsert.svg_viewbox,
+                        svg_content_length: firstInsert.svg_content?.length || 0
+                    });
+                }
+
+                const insertsByLayer = {};
+                data.inserts.forEach(insert => {
+                    const layerName = insert.metadata?.layer || 'Default';
+                    if (!insertsByLayer[layerName]) {
+                        insertsByLayer[layerName] = [];
+                    }
+                    insertsByLayer[layerName].push(insert);
+                });
+
+                let svgCount = 0;
+                let circleCount = 0;
+
+                Object.entries(insertsByLayer).forEach(([layerName, inserts]) => {
+                    const layerGroup = L.layerGroup();
+                    
+                    inserts.forEach(insert => {
+                        if (insert.insert_x == null || insert.insert_y == null) return;
+
+                        const geoCoords = cadToLatLon(insert.insert_x, insert.insert_y);
+                        if (!geoCoords) return;
+
+                        minLat = Math.min(minLat, geoCoords.lat);
+                        maxLat = Math.max(maxLat, geoCoords.lat);
+                        minLon = Math.min(minLon, geoCoords.lon);
+                        maxLon = Math.max(maxLon, geoCoords.lon);
+                        transformedCount++;
+
+                        const layer = data.layers.find(l => l.layer_name === layerName);
+                        const color = layer ? getColorFromIndex(layer.color) : '#999999';
+
+                        let marker;
+                        if (insert.svg_content) {
+                            svgCount++;
+                            const svgSize = 32;
+                            
+                            // Get viewbox from database or extract from SVG or use default
+                            let viewBox = insert.svg_viewbox;
+                            if (!viewBox && insert.svg_content) {
+                                // Try to extract viewBox from SVG content
+                                const viewBoxMatch = insert.svg_content.match(/viewBox=["']([^"']+)["']/i);
+                                if (viewBoxMatch) {
+                                    viewBox = viewBoxMatch[1];
+                                } else {
+                                    // Default viewbox for standard CAD symbols
+                                    viewBox = "0 0 100 100";
+                                }
+                            }
+                            
+                            const iconHtml = `
+                                <div style="width: ${svgSize}px; height: ${svgSize}px; transform: rotate(${insert.rotation || 0}deg);">
+                                    <svg viewBox="${viewBox}" 
+                                         width="${svgSize}" 
+                                         height="${svgSize}"
+                                         style="overflow: visible;">
+                                        ${insert.svg_content}
+                                    </svg>
+                                </div>
+                            `;
+                            
+                            const divIcon = L.divIcon({
+                                html: iconHtml,
+                                className: 'svg-marker',
+                                iconSize: [svgSize, svgSize],
+                                iconAnchor: [svgSize / 2, svgSize / 2]
+                            });
+                            
+                            marker = L.marker([geoCoords.lat, geoCoords.lon], { icon: divIcon });
+                        } else {
+                            circleCount++;
+                            marker = L.circleMarker([geoCoords.lat, geoCoords.lon], {
+                                radius: 6,
+                                fillColor: color,
+                                color: '#333',
+                                weight: 1,
+                                fillOpacity: 0.8
+                            });
+                        }
+
+                        const popupContent = `
+                            <div class="entity-popup">
+                                <h4>${insert.block_name || 'Entity'}</h4>
+                                <table>
+                                    <tr><td>Layer:</td><td>${layerName}</td></tr>
+                                    <tr><td>CAD X:</td><td>${insert.insert_x.toFixed(2)}</td></tr>
+                                    <tr><td>CAD Y:</td><td>${insert.insert_y.toFixed(2)}</td></tr>
+                                    <tr><td>Lat:</td><td>${geoCoords.lat.toFixed(6)}</td></tr>
+                                    <tr><td>Lon:</td><td>${geoCoords.lon.toFixed(6)}</td></tr>
+                                    ${insert.rotation ? `<tr><td>Rotation:</td><td>${insert.rotation.toFixed(1)}°</td></tr>` : ''}
+                                </table>
+                            </div>
+                        `;
+                        marker.bindPopup(popupContent);
+
+                        layerGroup.addLayer(marker);
+                    });
+
+                    layerGroup.addTo(map);
+                    layerGroups.current[layerName] = layerGroup;
+                });
+
+                console.log(`✅ Rendering complete: ${svgCount} SVG symbols, ${circleCount} circle markers`);
+                console.log(`Transformed ${transformedCount} entities`);
+                return transformedCount > 0 ? [[minLat, minLon], [maxLat, maxLon]] : null;
+            };
+
+            const renderDrawing = (map, data) => {
+                Object.values(layerGroups.current).forEach(group => group.remove());
+                layerGroups.current = {};
+
+                const insertsByLayer = {};
+                data.inserts.forEach(insert => {
+                    const layerName = insert.metadata?.layer || 'Default';
+                    if (!insertsByLayer[layerName]) {
+                        insertsByLayer[layerName] = [];
+                    }
+                    insertsByLayer[layerName].push(insert);
+                });
+
+                Object.entries(insertsByLayer).forEach(([layerName, inserts]) => {
+                    const layerGroup = L.layerGroup();
+                    
+                    inserts.forEach(insert => {
+                        if (insert.insert_x == null || insert.insert_y == null) return;
+
+                        const layer = data.layers.find(l => l.layer_name === layerName);
+                        const color = layer ? getColorFromIndex(layer.color) : '#999999';
+
+                        let marker;
+                        if (insert.svg_content) {
+                            const svgSize = 32;
+                            
+                            // Get viewbox from database or extract from SVG or use default
+                            let viewBox = insert.svg_viewbox;
+                            if (!viewBox && insert.svg_content) {
+                                // Try to extract viewBox from SVG content
+                                const viewBoxMatch = insert.svg_content.match(/viewBox=["']([^"']+)["']/i);
+                                if (viewBoxMatch) {
+                                    viewBox = viewBoxMatch[1];
+                                } else {
+                                    // Default viewbox for standard CAD symbols
+                                    viewBox = "0 0 100 100";
+                                }
+                            }
+                            
+                            const iconHtml = `
+                                <div style="width: ${svgSize}px; height: ${svgSize}px; transform: rotate(${insert.rotation || 0}deg);">
+                                    <svg viewBox="${viewBox}" 
+                                         width="${svgSize}" 
+                                         height="${svgSize}"
+                                         style="overflow: visible;">
+                                        ${insert.svg_content}
+                                    </svg>
+                                </div>
+                            `;
+                            
+                            const divIcon = L.divIcon({
+                                html: iconHtml,
+                                className: 'svg-marker',
+                                iconSize: [svgSize, svgSize],
+                                iconAnchor: [svgSize / 2, svgSize / 2]
+                            });
+                            
+                            marker = L.marker([insert.insert_y, insert.insert_x], { icon: divIcon });
+                        } else {
+                            marker = L.circleMarker([insert.insert_y, insert.insert_x], {
+                                radius: 6,
+                                fillColor: color,
+                                color: '#333',
+                                weight: 1,
+                                fillOpacity: 0.8
+                            });
+                        }
+
+                        const popupContent = `
+                            <div class="entity-popup">
+                                <h4>${insert.block_name || 'Entity'}</h4>
+                                <table>
+                                    <tr><td>Layer:</td><td>${layerName}</td></tr>
+                                    <tr><td>X:</td><td>${insert.insert_x.toFixed(2)}</td></tr>
+                                    <tr><td>Y:</td><td>${insert.insert_y.toFixed(2)}</td></tr>
+                                    ${insert.rotation ? `<tr><td>Rotation:</td><td>${insert.rotation.toFixed(1)}°</td></tr>` : ''}
+                                </table>
+                            </div>
+                        `;
+                        marker.bindPopup(popupContent);
+
+                        layerGroup.addLayer(marker);
+                    });
+
+                    layerGroup.addTo(map);
+                    layerGroups.current[layerName] = layerGroup;
+                });
+            };
+
+            const toggleLayer = (layerName) => {
+                const newVisibility = !visibleLayers[layerName];
+                setVisibleLayers(prev => ({
+                    ...prev,
+                    [layerName]: newVisibility
+                }));
+
+                const layerGroup = layerGroups.current[layerName];
+                if (layerGroup && leafletMap.current) {
+                    if (newVisibility) {
+                        layerGroup.addTo(leafletMap.current);
+                    } else {
+                        leafletMap.current.removeLayer(layerGroup);
+                    }
+                }
+            };
+
+            const changeBasemap = (basemapType) => {
+                if (!leafletMap.current || !drawingData?.drawing?.is_georeferenced) return;
+                setCurrentBasemap(basemapType);
+                addBasemap(leafletMap.current, basemapType);
+            };
+
+            const toggleGISLayer = (layerKey) => {
+                if (!leafletMap.current || !drawingData?.drawing?.is_georeferenced) {
+                    alert('GIS overlays are only available for georeferenced drawings.');
+                    return;
+                }
+
+                const newState = !gisLayersVisible[layerKey];
+                setGisLayersVisible(prev => ({ ...prev, [layerKey]: newState }));
+
+                if (newState) {
+                    if (!gisLayers.current[layerKey]) {
+                        console.log(`Loading ${GIS_LAYERS_CONFIG[layerKey].name}...`);
+                        
+                        try {
+                            const config = GIS_LAYERS_CONFIG[layerKey];
+                            const gisLayer = L.esri.featureLayer({
+                                url: config.url,
+                                style: function() {
+                                    return config.style;
+                                },
+                                simplifyFactor: 0.5,
+                                precision: 5
+                            });
+
+                            // Create popup function based on config
+                            gisLayer.bindPopup(function (layer) {
+                                const props = layer.feature.properties;
+                                const popupConfig = config.popupFields;
+                                
+                                let fieldsHtml = '';
+                                popupConfig.fields.forEach(field => {
+                                    let value = props[field.key] || 'N/A';
+                                    if (field.format && value !== 'N/A') {
+                                        value = field.format(value);
+                                    }
+                                    fieldsHtml += `<tr><td>${field.label}:</td><td>${value}</td></tr>`;
+                                });
+
+                                return `
+                                    <div class="entity-popup">
+                                        <h4>${popupConfig.title}</h4>
+                                        <table>
+                                            ${fieldsHtml}
+                                        </table>
+                                    </div>
+                                `;
+                            });
+
+                            gisLayer.on('loading', function() {
+                                console.log(`${config.name} loading...`);
+                            });
+
+                            gisLayer.on('load', function() {
+                                console.log(`${config.name} loaded successfully!`);
+                            });
+
+                            gisLayer.on('requesterror', function(e) {
+                                console.error(`${config.name} error:`, e);
+                                alert(`Failed to load ${config.name}. The GIS service may be unavailable.`);
+                            });
+
+                            gisLayers.current[layerKey] = gisLayer;
+                        } catch (error) {
+                            console.error(`Error creating ${layerKey} layer:`, error);
+                            alert(`Failed to initialize ${layerKey} layer: ` + error.message);
+                            setGisLayersVisible(prev => ({ ...prev, [layerKey]: false }));
+                            return;
+                        }
+                    }
+
+                    gisLayers.current[layerKey].addTo(leafletMap.current);
+                    console.log(`${GIS_LAYERS_CONFIG[layerKey].name} added to map`);
+                } else {
+                    if (gisLayers.current[layerKey]) {
+                        leafletMap.current.removeLayer(gisLayers.current[layerKey]);
+                        console.log(`${GIS_LAYERS_CONFIG[layerKey].name} removed from map`);
+                    }
+                }
+            };
+
+            const fitToView = () => {
+                if (!leafletMap.current || !drawingData) return;
+
+                if (drawingData.drawing.is_georeferenced) {
+                    const transformedBounds = [];
+                    Object.values(layerGroups.current).forEach(layerGroup => {
+                        layerGroup.eachLayer(layer => {
+                            if (layer.getLatLng) {
+                                transformedBounds.push(layer.getLatLng());
+                            }
+                        });
+                    });
+
+                    if (transformedBounds.length > 0) {
+                        const bounds = L.latLngBounds(transformedBounds);
+                        leafletMap.current.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                } else {
+                    const bounds = [];
+                    drawingData.inserts.forEach(insert => {
+                        if (insert.insert_x != null && insert.insert_y != null) {
+                            bounds.push([insert.insert_y, insert.insert_x]);
+                        }
+                    });
+
+                    if (bounds.length > 0) {
+                        leafletMap.current.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                }
+            };
+
+            if (loading && !selectedDrawing) {
+                return (
+                    <div className="text-center py-12">
+                        <i className="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
+                    </div>
+                );
+            }
+
+            if (!selectedDrawing) {
+                return (
+                    <div className="space-y-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Drawing Viewer</h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {drawings.map(drawing => (
+                                <div
+                                    key={drawing.drawing_id}
+                                    onClick={() => selectDrawing(drawing.drawing_id)}
+                                    className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
+                                >
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                                                {drawing.drawing_name}
+                                            </h3>
+                                            {drawing.drawing_number && (
+                                                <p className="text-sm text-gray-600">
+                                                    #{drawing.drawing_number}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <i className="fas fa-file-alt text-green-500 text-2xl"></i>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        {drawing.is_georeferenced && (
+                                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
+                                                <i className="fas fa-globe mr-1"></i>
+                                                GIS
+                                            </span>
+                                        )}
+                                    </div>
+                                    {drawing.drawing_type && (
+                                        <p className="text-sm text-gray-600 mb-2">
+                                            Type: {drawing.drawing_type}
+                                        </p>
+                                    )}
+                                    {drawing.drawing_coordinate_system && (
+                                        <p className="text-xs text-gray-500">
+                                            <i className="fas fa-map-pin mr-1"></i>
+                                            {drawing.drawing_coordinate_system}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => {
+                                setSelectedDrawing(null);
+                                setDrawingData(null);
+                                if (leafletMap.current) {
+                                    leafletMap.current.remove();
+                                    leafletMap.current = null;
+                                }
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                        >
+                            <i className="fas fa-arrow-left mr-2"></i>
+                            Back to List
+                        </button>
+                        <h2 className="text-xl font-semibold text-gray-800">
+                            {drawingData?.drawing?.drawing_name || 'Loading...'}
+                        </h2>
+                        {drawingData?.drawing?.is_georeferenced && (
+                            <span className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full">
+                                <i className="fas fa-globe mr-1"></i>
+                                Georeferenced
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="drawing-viewer-container">
+                        <div id="drawing-map" ref={mapRef}></div>
+
+                        <div className="drawing-controls">
+                            <button
+                                onClick={fitToView}
+                                className="px-4 py-2 bg-white hover:bg-gray-50 border-b"
+                                title="Fit to View"
+                            >
+                                <i className="fas fa-expand"></i>
+                            </button>
+                            <button
+                                onClick={() => selectDrawing(selectedDrawing)}
+                                className="px-4 py-2 bg-white hover:bg-gray-50"
+                                title="Refresh"
+                            >
+                                <i className="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+
+                        {drawingData && (
+                            <div className="layer-panel">
+                                <div className="p-4 border-b bg-gray-50">
+                                    <h3 className="font-semibold text-gray-800">
+                                        <i className="fas fa-layer-group mr-2"></i>
+                                        Layers & GIS
+                                    </h3>
+                                    <p className="text-xs text-gray-600 mt-1">
+                                        {drawingData.stats.insert_count} entities
+                                    </p>
+                                </div>
+
+                                <div className="p-3">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">CAD Layers</h4>
+                                    {drawingData.layers.map(layer => (
+                                        <div
+                                            key={layer.layer_id}
+                                            onClick={() => toggleLayer(layer.layer_name)}
+                                            className="layer-item flex items-center gap-3"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={visibleLayers[layer.layer_name] || false}
+                                                onChange={() => {}}
+                                                className="w-4 h-4"
+                                            />
+                                            <div
+                                                className="layer-color-box"
+                                                style={{ backgroundColor: getColorFromIndex(layer.color) }}
+                                            ></div>
+                                            <span className="text-sm">{layer.layer_name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {drawingData.drawing.is_georeferenced && (
+                                    <div className="gis-section p-3">
+                                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                            <i className="fas fa-globe mr-1"></i>
+                                            Basemaps
+                                        </h4>
+                                        {['streets', 'satellite', 'osm', 'topo'].map(type => (
+                                            <div
+                                                key={type}
+                                                onClick={() => changeBasemap(type)}
+                                                className={`basemap-option ${currentBasemap === type ? 'active' : ''}`}
+                                            >
+                                                <span className="text-sm capitalize">{type}</span>
+                                            </div>
+                                        ))}
+
+                                        <h4 className="text-sm font-semibold text-gray-700 mt-4 mb-2">
+                                            <i className="fas fa-map-marked-alt mr-1"></i>
+                                            GIS Layers
+                                        </h4>
+                                        
+                                        {/* Parcels Layer */}
+                                        <div
+                                            onClick={() => toggleGISLayer('parcels')}
+                                            className="layer-item flex items-center gap-3"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={gisLayersVisible.parcels}
+                                                onChange={() => {}}
+                                                className="w-4 h-4"
+                                            />
+                                            <div
+                                                className="layer-color-box"
+                                                style={{ backgroundColor: '#ff7800' }}
+                                            ></div>
+                                            <span className="text-sm">Sonoma County Parcels</span>
+                                        </div>
+
+                                        {/* Roads Layer */}
+                                        <div
+                                            onClick={() => toggleGISLayer('roads')}
+                                            className="layer-item flex items-center gap-3"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={gisLayersVisible.roads}
+                                                onChange={() => {}}
+                                                className="w-4 h-4"
+                                            />
+                                            <div
+                                                className="layer-color-box"
+                                                style={{ backgroundColor: '#2563eb' }}
+                                            ></div>
+                                            <span className="text-sm">Streets & Roads</span>
+                                        </div>
+
+                                        {/* Buildings Layer */}
+                                        <div
+                                            onClick={() => toggleGISLayer('buildings')}
+                                            className="layer-item flex items-center gap-3"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={gisLayersVisible.buildings}
+                                                onChange={() => {}}
+                                                className="w-4 h-4"
+                                            />
+                                            <div
+                                                className="layer-color-box"
+                                                style={{ backgroundColor: '#dc2626' }}
+                                            ></div>
+                                            <span className="text-sm">Buildings</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {loading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50">
+                                <i className="fas fa-spinner fa-spin text-4xl text-blue-500"></i>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Symbols Tab Component (Placeholder)
+        function SymbolsTab() {
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-800">Symbols Library</h2>
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                        <i className="fas fa-shapes text-4xl text-gray-400 mb-4"></i>
+                        <p className="text-gray-600">Symbol management coming soon</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // Import/Export Tab Component (Placeholder)
+        function ImportExportTab() {
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-800">Import/Export</h2>
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                        <i className="fas fa-exchange-alt text-4xl text-gray-400 mb-4"></i>
+                        <p className="text-gray-600">Import/Export tools coming soon</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // Diagnostics Tab Component (Placeholder)
+        function DiagnosticsTab() {
+            return (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-gray-800">System Diagnostics</h2>
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <h3 className="text-xl font-semibold mb-4">Available GIS Layers</h3>
+                        <div className="space-y-3">
+                            {Object.entries(GIS_LAYERS_CONFIG).map(([key, config]) => (
+                                <div key={key} className="flex items-center space-x-3 p-3 bg-gray-50 rounded">
+                                    <i className="fas fa-map-marked-alt text-blue-500"></i>
+                                    <div className="flex-1">
+                                        <p className="font-medium">{config.name}</p>
+                                        <p className="text-sm text-gray-600">{config.url}</p>
+                                    </div>
+                                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                        Active
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Dashboard />);
+    </script>
+</body>
+</html>
