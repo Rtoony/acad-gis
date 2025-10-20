@@ -71,6 +71,7 @@
 4. Map Viewer (geographic visualization)
 5. Drawing Importer (DXF upload)
 6. Symbol Library (browse blocks)
+7. Sheet Note Manager (standardized notes across sheets)
 
 ---
 
@@ -95,6 +96,9 @@ Transpiler:     Babel Standalone (for JSX in browser)
 State:          React useState (local only)
 API Calls:      Fetch API
 ```
+
+### CivilMicroTools (Inspiration)
+Data-first civil tools (Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager) are proposed to sit alongside existing tools. They treat the database as the system of record and generate CAD/GIS exports (DXF/LandXML/SVG/JSON/CSV). See `docs/CIVILMICROTOOLS_PLAN.md`.
 
 ### Development Environment
 ```

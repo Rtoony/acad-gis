@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Manager | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <!-- Shared utilities -->
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script src="../shared/state.js"></script>
+  <script src="../shared/dev-tools.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Project Manager'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+    const DataTableComp = window.DataTable || (({ data }) => React.createElement('pre', null, JSON.stringify(data, null, 2)));
+    const LoadingSpinnerComp = window.LoadingSpinner || (({ text }) => React.createElement('div', null, text || 'Loading...'));
+    const ModalComp = window.Modal || (({ isOpen, title, children, onClose }) => isOpen ? React.createElement('div', null, React.createElement('h3', null, title), children, React.createElement('button', { onClick: onClose }, 'Close')) : null);
+    const Toast = window.ToastManager || {
+      info: console.log,
+      success: console.log,
+      warning: console.warn,
+      error: console.error,
+    };
+    const apiClient = window.API || {
+      list: async () => [],
+      delete: async () => {},
+    };
+
+    function ProjectManager() {
+      const [projects, setProjects] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+      const [showView, setShowView] = useState(false);
+      const [selected, setSelected] = useState(null);
+
+      const load = async () => {
+        setLoading(true); setError('');
+        try {
+          const data = await apiClient.list('/projects');
+          setProjects(data);
+        } catch (e) {
+          setError(e.message || 'Failed to load projects');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => { load(); }, []);
+
+      const columns = [
+        { key: 'project_number', label: 'Project #', sortable: true },
+        { key: 'project_name', label: 'Project Name', sortable: true },
+        { key: 'client_name', label: 'Client', sortable: true },
+        { key: 'drawing_count', label: 'Drawings', sortable: true, format: 'number' },
+        { key: 'created_at', label: 'Created', sortable: true, format: 'date' },
+      ];
+
+      const onView = (row) => { setSelected(row); setShowView(true); };
+      const onEdit = (row) => { Toast.info(`Edit ${row.project_name}`); };
+      const onDelete = async (row) => {
+        if (!confirm(`Delete project "${row.project_name}"?`)) return;
+        try { await apiClient.delete('/projects', row.project_id); Toast.success('Deleted'); await load(); }
+        catch (e) { Toast.error(e.message); }
+      };
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(HeaderComp, {
+            title: 'Project Manager',
+            subtitle: 'Browse, create, and manage projects',
+          }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card mb-lg' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Projects'),
+                  React.createElement('div', null,
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: load },
+                      React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh'
+                    ),
+                    ' ',
+                    React.createElement('a', { className: 'btn btn-primary', href: 'drawing-importer.html' },
+                      React.createElement('i', { className: 'fas fa-file-import' }), ' Import Drawings')
+                  )
+                ),
+                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
+                loading ? React.createElement(LoadingSpinnerComp, { text: 'Loading projects...' }) :
+                  React.createElement(DataTableComp, {
+                    data: projects,
+                    columns,
+                    onView,
+                    onEdit,
+                    onDelete,
+                    searchable: true,
+                    pagination: true,
+                    pageSize: 20,
+                    emptyMessage: 'No projects found'
+                  })
+              )
+            )
+          ),
+          React.createElement(ModalComp, {
+            isOpen: showView,
+            onClose: () => setShowView(false),
+            title: selected ? selected.project_name : 'Project'
+          },
+            selected && React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', null,
+                React.createElement('div', { className: 'text-muted' }, 'Project #'),
+                React.createElement('div', null, selected.project_number || '-')
+              ),
+              React.createElement('div', null,
+                React.createElement('div', { className: 'text-muted' }, 'Client'),
+                React.createElement('div', null, selected.client_name || '-')
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('div', { className: 'text-muted' }, 'Description'),
+                React.createElement('div', null, selected.description || '-')
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ProjectManager));
+  </script>
+</body>
+</html>

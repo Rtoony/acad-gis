@@ -1,6 +1,6 @@
 /**
  * ACAD=GIS Mission Control Shared Styles
- * Version: 1.0
+ * Version: 2.0
  * 
  * This stylesheet provides consistent Mission Control theming across all tools.
  * Import this file in every tool HTML to maintain visual consistency.
@@ -500,6 +500,60 @@ body {
 .loading-text {
     margin-top: var(--spacing-md);
     color: var(--color-text-secondary);
+}
+
+/* ============================================
+   DATATABLE STYLES
+   ============================================ */
+.datatable-wrapper {
+    width: 100%;
+}
+
+.datatable {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.datatable thead {
+    background: rgba(59, 130, 246, 0.2);
+    border-bottom: 2px solid rgba(59, 130, 246, 0.5);
+}
+
+.datatable th {
+    padding: var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.datatable th:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.datatable tbody tr {
+    border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+    transition: all var(--transition-fast);
+}
+
+.datatable tbody tr:hover {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.datatable td {
+    padding: var(--spacing-md);
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+}
+
+.datatable tbody tr:last-child {
+    border-bottom: none;
 }
 
 /* ============================================

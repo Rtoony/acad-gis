@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Shared Styles -->
-    <link rel="stylesheet" href="shared/styles.css">
+    <link rel="stylesheet" href="frontend/shared/styles.css">
     
     <style>
         .tool-grid {
@@ -114,20 +114,135 @@
 <body class="grid-background">
     <div id="root"></div>
 
-    <!-- Shared Components -->
-    <script src="shared/components.js"></script>
+    <!-- Shared Utilities (API helpers only) -->
+    <script src="frontend/shared/components.js"></script>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // Tool Configuration
+        // ============================================
+        // SHARED REACT COMPONENTS (inline in each tool)
+        // ============================================
+
+        function ApiStatus() {
+            const [connected, setConnected] = useState(false);
+            const [checking, setChecking] = useState(true);
+
+            useEffect(() => {
+                checkConnection();
+                const interval = setInterval(checkConnection, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const checkConnection = async () => {
+                const isConnected = await api.checkHealth();
+                setConnected(isConnected);
+                setChecking(false);
+            };
+
+            if (checking) {
+                return (
+                    <div className="status-indicator" style={{ background: 'rgba(59, 130, 246, 0.2)' }}>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        <span>Checking API...</span>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`status-indicator ${connected ? 'status-online' : 'status-offline'}`}>
+                    <span className="status-dot"></span>
+                    <span>{connected ? 'API Connected' : 'API Offline'}</span>
+                </div>
+            );
+        }
+
+        function LoadingSpinner({ text = 'Loading...' }) {
+            return (
+                <div className="text-center" style={{ padding: '3rem' }}>
+                    <div className="spinner" style={{ margin: '0 auto' }}></div>
+                    <p className="loading-text mt-md">{text}</p>
+                </div>
+            );
+        }
+
+        function StatCard({ icon, label, value, color = 'blue' }) {
+            const colors = {
+                blue: { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' },
+                green: { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981' },
+                orange: { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b' },
+                purple: { bg: 'rgba(168, 85, 247, 0.2)', text: '#a855f7' }
+            };
+
+            const colorStyle = colors[color];
+
+            return (
+                <div className="card">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem' }}>
+                                {label}
+                            </p>
+                            <p style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem' }}>
+                                {value}
+                            </p>
+                        </div>
+                        <div 
+                            style={{ 
+                                width: '60px', 
+                                height: '60px', 
+                                borderRadius: 'var(--radius-lg)',
+                                background: colorStyle.bg,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <i className={`fas fa-${icon}`} style={{ fontSize: '1.75rem', color: colorStyle.text }}></i>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function Header({ title, subtitle }) {
+            return (
+                <header className="header">
+                    <div className="header-content">
+                        <div className="header-title">
+                            <i className="fas fa-drafting-compass" style={{ fontSize: '2rem' }}></i>
+                            <div>
+                                <h1 className="orbitron neon-blue">{title}</h1>
+                                {subtitle && <p className="header-subtitle">{subtitle}</p>}
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
+                            <ApiStatus />
+                        </div>
+                    </div>
+                </header>
+            );
+        }
+
+        function Footer() {
+            return (
+                <footer className="footer">
+                    ACAD=GIS © 2025 • CAD Database Management System
+                </footer>
+            );
+        }
+
+        // ============================================
+        // TOOL LAUNCHER APP
+        // ============================================
+
         const TOOLS = [
             {
                 id: 'project-manager',
                 name: 'Project Manager',
                 description: 'Create, edit, and manage projects. Organize your drawings and track project information.',
                 icon: 'folder-open',
-                url: 'tools/project_manager.html',
+                url: 'frontend/tools/project_manager.html',
                 color: 'blue',
                 badge: 'Core'
             },
@@ -136,7 +251,7 @@
                 name: 'Drawing Browser',
                 description: 'Search, filter, and browse all drawings. Quick access to view and manage drawing files.',
                 icon: 'search',
-                url: 'tools/drawing_browser.html',
+                url: 'frontend/tools/drawing_browser.html',
                 color: 'green',
                 badge: 'Core'
             },
@@ -145,7 +260,7 @@
                 name: 'Map Viewer',
                 description: 'View georeferenced drawings on interactive maps with GIS layer overlays.',
                 icon: 'map',
-                url: 'tools/map_viewer.html',
+                url: 'frontend/tools/map_viewer.html',
                 color: 'purple',
                 badge: 'GIS'
             },
@@ -154,7 +269,7 @@
                 name: 'Drawing Importer',
                 description: 'Upload and import DXF files. Configure georeferencing and process CAD drawings.',
                 icon: 'file-upload',
-                url: 'tools/drawing_importer.html',
+                url: 'frontend/tools/drawing_importer.html',
                 color: 'orange',
                 badge: 'Import'
             },
@@ -163,13 +278,12 @@
                 name: 'Symbol Library',
                 description: 'Browse and manage block definitions. Preview SVG symbols and view metadata.',
                 icon: 'shapes',
-                url: 'tools/symbol_library.html',
+                url: 'frontend/tools/symbol_library.html',
                 color: 'red',
                 badge: 'Coming Soon'
             }
         ];
 
-        // Main App Component
         function ToolLauncher() {
             const [stats, setStats] = useState(null);
             const [loading, setLoading] = useState(true);
@@ -184,7 +298,6 @@
                     const statsData = await api.get('/stats');
                     setStats(statsData);
                     
-                    // Generate recent activity from stats
                     const activity = [];
                     if (statsData.recent_drawings && statsData.recent_drawings.length > 0) {
                         statsData.recent_drawings.slice(0, 3).forEach(drawing => {
@@ -197,7 +310,6 @@
                         });
                     }
                     
-                    // Add system activity
                     activity.push({
                         icon: 'check-circle',
                         color: 'blue',
@@ -252,7 +364,6 @@
 
                     <main className="main-content">
                         <div className="container">
-                            {/* Welcome Section */}
                             <div style={{ marginBottom: '3rem' }}>
                                 <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem' }} className="neon-blue">
                                     Welcome to Mission Control
@@ -262,44 +373,20 @@
                                 </p>
                             </div>
 
-                            {/* Statistics */}
                             {loading ? (
                                 <LoadingSpinner text="Loading statistics..." />
                             ) : (
                                 <>
                                     <div className="stats-grid">
-                                        <StatCard
-                                            icon="folder"
-                                            label="Total Projects"
-                                            value={stats?.total_projects || 0}
-                                            color="blue"
-                                        />
-                                        <StatCard
-                                            icon="file-alt"
-                                            label="Total Drawings"
-                                            value={stats?.total_drawings || 0}
-                                            color="green"
-                                        />
-                                        <StatCard
-                                            icon="shapes"
-                                            label="Symbols"
-                                            value={stats?.total_symbols || 0}
-                                            color="orange"
-                                        />
-                                        <StatCard
-                                            icon="layer-group"
-                                            label="Layer Standards"
-                                            value={stats?.total_layers || 0}
-                                            color="purple"
-                                        />
+                                        <StatCard icon="folder" label="Total Projects" value={stats?.total_projects || 0} color="blue" />
+                                        <StatCard icon="file-alt" label="Total Drawings" value={stats?.total_drawings || 0} color="green" />
+                                        <StatCard icon="shapes" label="Symbols" value={stats?.total_symbols || 0} color="orange" />
+                                        <StatCard icon="layer-group" label="Layer Standards" value={stats?.total_layers || 0} color="purple" />
                                     </div>
 
                                     <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
-                                        {/* Tools Grid */}
                                         <div>
-                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-                                                Available Tools
-                                            </h3>
+                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Available Tools</h3>
                                             <div className="tool-grid">
                                                 {TOOLS.map(tool => {
                                                     const iconColors = getIconColorClass(tool.color);
@@ -316,25 +403,16 @@
                                                                 cursor: isComingSoon ? 'not-allowed' : 'pointer'
                                                             }}
                                                         >
-                                                            <div 
-                                                                className="tool-icon"
-                                                                style={{
-                                                                    background: iconColors.bg,
-                                                                    color: iconColors.text
-                                                                }}
-                                                            >
+                                                            <div className="tool-icon" style={{ background: iconColors.bg, color: iconColors.text }}>
                                                                 <i className={`fas fa-${tool.icon}`}></i>
                                                             </div>
                                                             <div className="tool-title">{tool.name}</div>
                                                             <div className="tool-description">{tool.description}</div>
-                                                            <span 
-                                                                className="tool-badge"
-                                                                style={{
-                                                                    background: badgeColors.bg,
-                                                                    color: badgeColors.text,
-                                                                    border: `1px solid ${badgeColors.border}`
-                                                                }}
-                                                            >
+                                                            <span className="tool-badge" style={{
+                                                                background: badgeColors.bg,
+                                                                color: badgeColors.text,
+                                                                border: `1px solid ${badgeColors.border}`
+                                                            }}>
                                                                 {tool.badge}
                                                             </span>
                                                         </div>
@@ -343,35 +421,20 @@
                                             </div>
                                         </div>
 
-                                        {/* Recent Activity */}
                                         <div>
-                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
-                                                Recent Activity
-                                            </h3>
+                                            <h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Recent Activity</h3>
                                             <div className="recent-activity">
                                                 {recentActivity.length > 0 ? (
                                                     recentActivity.map((activity, index) => {
                                                         const iconColors = getIconColorClass(activity.color);
                                                         return (
                                                             <div key={index} className="activity-item">
-                                                                <div 
-                                                                    className="activity-icon"
-                                                                    style={{
-                                                                        background: iconColors.bg,
-                                                                        color: iconColors.text
-                                                                    }}
-                                                                >
+                                                                <div className="activity-icon" style={{ background: iconColors.bg, color: iconColors.text }}>
                                                                     <i className={`fas fa-${activity.icon}`}></i>
                                                                 </div>
                                                                 <div style={{ flex: 1 }}>
-                                                                    <div style={{ fontSize: '0.875rem' }}>
-                                                                        {activity.text}
-                                                                    </div>
-                                                                    <div style={{ 
-                                                                        fontSize: '0.75rem', 
-                                                                        color: 'var(--color-text-muted)',
-                                                                        marginTop: '0.25rem'
-                                                                    }}>
+                                                                    <div style={{ fontSize: '0.875rem' }}>{activity.text}</div>
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
                                                                         {formatDate(activity.time)}
                                                                     </div>
                                                                 </div>
@@ -386,63 +449,35 @@
                                                 )}
                                             </div>
 
-                                            {/* Quick Actions */}
                                             <div style={{ marginTop: '1.5rem' }}>
-                                                <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
-                                                    Quick Actions
-                                                </h3>
+                                                <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Quick Actions</h3>
                                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                                    <button 
-                                                        className="btn btn-primary"
-                                                        onClick={() => openTool('tools/project_manager.html')}
-                                                        style={{ justifyContent: 'flex-start' }}
-                                                    >
-                                                        <i className="fas fa-plus"></i>
-                                                        Create New Project
+                                                    <button className="btn btn-primary" onClick={() => openTool('frontend/tools/project-manager.html')} style={{ justifyContent: 'flex-start' }}>
+                                                        <i className="fas fa-plus"></i> Create New Project
                                                     </button>
-                                                    <button 
-                                                        className="btn btn-secondary"
-                                                        onClick={() => openTool('tools/drawing_importer.html')}
-                                                        style={{ justifyContent: 'flex-start' }}
-                                                    >
-                                                        <i className="fas fa-file-upload"></i>
-                                                        Import Drawing
+                                                    <button className="btn btn-secondary" onClick={() => openTool('frontend/tools/drawing-importer.html')} style={{ justifyContent: 'flex-start' }}>
+                                                        <i className="fas fa-file-upload"></i> Import Drawing
                                                     </button>
-                                                    <button 
-                                                        className="btn btn-secondary"
-                                                        onClick={() => openTool('tools/drawing_browser.html')}
-                                                        style={{ justifyContent: 'flex-start' }}
-                                                    >
-                                                        <i className="fas fa-search"></i>
-                                                        Browse Drawings
+                                                    <button className="btn btn-secondary" onClick={() => openTool('frontend/tools/drawing_browser.html')} style={{ justifyContent: 'flex-start' }}>
+                                                        <i className="fas fa-search"></i> Browse Drawings
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Help Section */}
                                     <div className="card" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
                                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                                             <i className="fas fa-info-circle" style={{ fontSize: '1.5rem', color: 'var(--color-accent-blue)' }}></i>
                                             <div>
-                                                <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
-                                                    Getting Started
-                                                </h3>
+                                                <h3 style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>Getting Started</h3>
                                                 <p style={{ color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
                                                     Welcome to ACAD=GIS! This tool launcher provides access to all system features. 
-                                                    Start by creating a project or importing drawings. Each tool opens in a new window 
-                                                    for easy multitasking.
+                                                    Start by creating a project or importing drawings. Each tool opens in a new window for easy multitasking.
                                                 </p>
                                                 <div style={{ display: 'flex', gap: '1rem' }}>
-                                                    <button className="btn btn-ghost">
-                                                        <i className="fas fa-book"></i>
-                                                        View Documentation
-                                                    </button>
-                                                    <button className="btn btn-ghost" onClick={loadData}>
-                                                        <i className="fas fa-sync-alt"></i>
-                                                        Refresh Statistics
-                                                    </button>
+                                                    <button className="btn btn-ghost"><i className="fas fa-book"></i> View Documentation</button>
+                                                    <button className="btn btn-ghost" onClick={loadData}><i className="fas fa-sync-alt"></i> Refresh Statistics</button>
                                                 </div>
                                             </div>
                                         </div>
@@ -457,7 +492,6 @@
             );
         }
 
-        // Render the app
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ToolLauncher />);
     </script>

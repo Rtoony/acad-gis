@@ -523,6 +523,54 @@ def get_drawing_render_data(drawing_id: str, limit: int = 2500):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get drawing data: {str(e)}")
 
+@app.get("/api/drawings/{drawing_id}/extent")
+def get_drawing_extent(drawing_id: str):
+    """Return full drawing bounds (no row limit) and EPSG code.
+
+    Bounds are computed from all block_inserts for the drawing. If no inserts
+    exist, returns count=0 and zero bounds so clients can handle gracefully.
+    """
+    try:
+        drawing = database.get_drawing(drawing_id)
+        if not drawing:
+            raise HTTPException(status_code=404, detail="Drawing not found")
+
+        bounds_row = database.execute_single(
+            """
+            SELECT
+                MIN(insert_x) AS min_x,
+                MIN(insert_y) AS min_y,
+                MAX(insert_x) AS max_x,
+                MAX(insert_y) AS max_y,
+                COUNT(*)      AS feature_count
+            FROM block_inserts
+            WHERE drawing_id = %s
+            """,
+            (drawing_id,)
+        )
+
+        feature_count = bounds_row.get('feature_count', 0) if bounds_row else 0
+        if not bounds_row or bounds_row['min_x'] is None or bounds_row['min_y'] is None:
+            # No symbol data yet; return empty bounds
+            bounds = {"min_x": 0, "min_y": 0, "max_x": 0, "max_y": 0}
+        else:
+            bounds = {
+                "min_x": float(bounds_row['min_x']),
+                "min_y": float(bounds_row['min_y']),
+                "max_x": float(bounds_row['max_x']),
+                "max_y": float(bounds_row['max_y'])
+            }
+
+        return {
+            "drawing_epsg_code": drawing.get('drawing_epsg_code'),
+            "bounds": bounds,
+            "stats": {"feature_count": feature_count}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get drawing extent: {str(e)}")
+
 def calculate_drawing_bounds(inserts):
     """Calculate bounding box for drawing"""
     if not inserts:

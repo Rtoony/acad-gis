@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawing Importer | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <!-- Shared utilities -->
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script src="../shared/state.js"></script>
+  <script src="../shared/dev-tools.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Drawing Importer'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+    const Toast = window.ToastManager || {
+      info: console.log,
+      success: console.log,
+      warning: console.warn,
+      error: console.error,
+    };
+    const apiClient = window.API || {
+      list: async () => [],
+      uploadWithProgress: async () => ({}),
+    };
+
+    function DrawingImporter() {
+      const [projects, setProjects] = useState([]);
+      const [projectId, setProjectId] = useState('');
+      const [files, setFiles] = useState([]);
+      const [isGeo, setIsGeo] = useState(true);
+      const [epsg, setEpsg] = useState('EPSG:2226');
+      const [progress, setProgress] = useState(0);
+      const [uploading, setUploading] = useState(false);
+      const [error, setError] = useState('');
+
+      useEffect(() => {
+        (async () => {
+          try { setProjects(await apiClient.list('/projects')); }
+          catch (e) { setError(e.message || 'Failed to load projects'); }
+        })();
+      }, []);
+
+      const onDrop = (e) => {
+        e.preventDefault();
+        setFiles(Array.from(e.dataTransfer.files));
+      };
+      const onPick = (e) => setFiles(Array.from(e.target.files || []));
+
+      const upload = async () => {
+        if (!projectId) { Toast.warning('Select a project first'); return; }
+        if (files.length === 0) { Toast.warning('Choose at least one file'); return; }
+        setError(''); setUploading(true); setProgress(0);
+        try {
+          const form = new FormData();
+          files.forEach((f) => form.append('file', f));
+          form.append('project_id', projectId);
+          form.append('is_georeferenced', String(isGeo));
+          form.append('epsg_code', epsg);
+          const res = await apiClient.uploadWithProgress('/import/dxf', form, (pct) => setProgress(pct));
+          Toast.success('Import complete');
+          console.log('Upload response', res);
+        } catch (e) {
+          setError(e.message || 'Upload failed');
+          Toast.error('Upload failed');
+        } finally { setUploading(false); }
+      };
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(HeaderComp, { title: 'Drawing Importer', subtitle: 'Upload DXF/DWG files into a project' }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card mb-lg' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Import Settings')
+                ),
+                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
+                React.createElement('div', { className: 'grid grid-cols-3 gap-md' },
+                  React.createElement('div', null,
+                    React.createElement('label', { className: 'text-muted' }, 'Project'),
+                    React.createElement('select', {
+                      className: 'input', value: projectId, onChange: (e) => setProjectId(e.target.value)
+                    },
+                      React.createElement('option', { value: '' }, 'Select a project...'),
+                      projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_number || '—'} — ${p.project_name}`))
+                    )
+                  ),
+                  React.createElement('div', null,
+                    React.createElement('label', { className: 'text-muted' }, 'Coordinate System (EPSG)'),
+                    React.createElement('input', { className: 'input', value: epsg, onChange: (e) => setEpsg(e.target.value), placeholder: 'EPSG:XXXX' })
+                  ),
+                  React.createElement('div', null,
+                    React.createElement('label', { className: 'text-muted' }, 'Georeferenced?'),
+                    React.createElement('div', { className: 'flex gap-sm' },
+                      React.createElement('input', { type: 'checkbox', checked: isGeo, onChange: (e) => setIsGeo(e.target.checked) }),
+                      React.createElement('span', null, 'Files are already georeferenced')
+                    )
+                  )
+                )
+              ),
+
+              React.createElement('div', { className: 'card' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Files')
+                ),
+                React.createElement('div', {
+                  onDragOver: (e) => e.preventDefault(),
+                  onDrop,
+                  className: 'border-dashed',
+                  style: {
+                    border: '2px dashed rgba(59,130,246,0.5)',
+                    padding: '24px', borderRadius: '12px', textAlign: 'center'
+                  }
+                },
+                  React.createElement('p', { className: 'mb-md' }, 'Drag and drop files here'),
+                  React.createElement('input', { type: 'file', multiple: true, onChange: onPick })
+                ),
+                files.length > 0 && React.createElement('div', { className: 'mt-md' },
+                  React.createElement('ul', null, files.map(f => React.createElement('li', { key: f.name }, f.name)))
+                ),
+                uploading && React.createElement('div', { className: 'mt-md' },
+                  React.createElement('div', { style: { height: '10px', background: 'rgba(59,130,246,0.15)', borderRadius: '8px' } },
+                    React.createElement('div', { style: { width: `${progress}%`, height: '10px', background: '#3b82f6', borderRadius: '8px' } })
+                  ),
+                  React.createElement('div', { className: 'text-muted mt-sm' }, `${progress}%`)
+                ),
+                React.createElement('div', { className: 'card-footer flex', style: { justifyContent: 'flex-end', gap: '8px' } },
+                  React.createElement('button', { className: 'btn btn-ghost', disabled: uploading, onClick: () => { setFiles([]); setProgress(0); } }, 'Clear'),
+                  React.createElement('button', { className: 'btn btn-primary', disabled: uploading, onClick: upload },
+                    React.createElement('i', { className: 'fas fa-upload' }), ' Upload'
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(DrawingImporter));
+  </script>
+</body>
+</html>

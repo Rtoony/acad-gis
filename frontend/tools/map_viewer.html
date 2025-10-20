@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Map Viewer | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/proj4@2.9.2/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+  <style>
+    #map { height: calc(100vh - 260px); border-radius: 12px; }
+    .toolbar { display:flex; gap: 12px; align-items:center; }
+    .statusbar { display:flex; justify-content:space-between; color: var(--color-text-secondary); font-size: 0.85rem; padding-top: 8px; }
+    .input, select.input { background: rgba(15,23,42,0.8); color: #e0e7ff; border: 1px solid rgba(59,130,246,0.35); padding: 6px 10px; border-radius: 8px; }
+    .sep { width:1px; height:24px; background: rgba(59,130,246,0.35); }
+  </style>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script type="text/babel">
+    const { useEffect, useRef, useState } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Map Viewer'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+
+    function MapViewer() {
+      const mapRef = useRef(null);
+      const mapEl = useRef(null);
+      const [ready, setReady] = useState(false);
+      const [projects, setProjects] = useState([]);
+      const [drawings, setDrawings] = useState([]);
+      const [projectId, setProjectId] = useState('');
+      const [drawingId, setDrawingId] = useState('');
+      const [mousePos, setMousePos] = useState({ lat: 0, lng: 0 });
+      const [zoom, setZoom] = useState(12);
+      const apiClient = window.API || { list: async () => [], request: async () => ({}) };
+      const locate = useRef({ marker: null, circle: null });
+
+      useEffect(() => {
+        if (mapRef.current) return; // already init
+
+        // Basemaps
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20, attribution: '&copy; OpenStreetMap'
+        });
+        const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 20, attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+        });
+        const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20, attribution: '&copy; CARTO'
+        });
+
+        const map = L.map(mapEl.current, {
+          center: [38.4405, -122.7144], // Santa Rosa, CA default
+          zoom: 12,
+          zoomControl: false,
+          layers: [osm]
+        });
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        L.control.scale().addTo(map);
+        L.control.layers({ 'OSM': osm, 'Esri Imagery': esri, 'CARTO Voyager': carto }, {}, { position: 'topright' }).addTo(map);
+
+        // Example: draw a demo marker
+        L.marker([38.4405, -122.7144]).addTo(map).bindPopup('Map Viewer Ready');
+
+        mapRef.current = map;
+        map.on('mousemove', (e) => setMousePos({ lat: e.latlng.lat, lng: e.latlng.lng }));
+        map.on('zoomend', () => setZoom(map.getZoom()));
+        setReady(true);
+      }, []);
+
+      // Load projects
+      useEffect(() => {
+        (async () => {
+          try { setProjects(await apiClient.list('/projects')); }
+          catch (e) { console.warn('Failed to load projects', e); }
+        })();
+      }, []);
+
+      // Load drawings when project changes
+      useEffect(() => {
+        if (!projectId) { setDrawings([]); setDrawingId(''); return; }
+        (async () => {
+          try { setDrawings(await apiClient.list(`/projects/${projectId}/drawings`)); }
+          catch (e) { console.warn('Failed to load drawings', e); setDrawings([]); }
+        })();
+      }, [projectId]);
+
+      // Zoom to drawing extent
+      useEffect(() => {
+        if (!drawingId || !mapRef.current) return;
+        (async () => {
+          try {
+            const data = await apiClient.request('GET', `/drawings/${drawingId}/extent`);
+            if (data && data.bounds) {
+              const epsg = data.drawing_epsg_code || 'EPSG:4326';
+              const b = data.bounds;
+              const ll = transformToLatLng([b.min_x, b.min_y], epsg);
+              const ur = transformToLatLng([b.max_x, b.max_y], epsg);
+              const sw = L.latLng(ll.lat, ll.lng);
+              const ne = L.latLng(ur.lat, ur.lng);
+              mapRef.current.fitBounds(L.latLngBounds(sw, ne), { padding: [30, 30] });
+            }
+          } catch (e) {
+            console.warn('Failed to get drawing bounds', e);
+          }
+        })();
+      }, [drawingId]);
+
+      function transformToLatLng([x, y], fromEpsg) {
+        try {
+          ensureEpsg(fromEpsg);
+          const out = proj4(fromEpsg, 'EPSG:4326', [x, y]);
+          return { lat: out[1], lng: out[0] };
+        } catch (e) {
+          return { lat: y, lng: x };
+        }
+      }
+
+      function ensureEpsg(code) {
+        if (!code || code === 'EPSG:4326' || code === 'EPSG:3857') return;
+        if (proj4 && !proj4.defs[code]) {
+          if (code === 'EPSG:2226') {
+            proj4.defs('EPSG:2226', '+proj=lcc +lat_1=39.83333333333334 +lat_2=38.33333333333334 +lat_0=37.66666666666666 +lon_0=-122 +x_0=6561666.666666666 +y_0=1640416.666666667 +datum=NAD83 +units=us-ft +no_defs');
+          }
+        }
+      }
+
+      function doLocate() {
+        const map = mapRef.current; if (!map) return;
+        map.locate({ setView: false, watch: false, enableHighAccuracy: true })
+          .on('locationfound', (e) => {
+            if (locate.current.marker) { map.removeLayer(locate.current.marker); }
+            if (locate.current.circle) { map.removeLayer(locate.current.circle); }
+            locate.current.marker = L.marker(e.latlng).addTo(map);
+            locate.current.circle = L.circle(e.latlng, { radius: e.accuracy, color: '#3b82f6' }).addTo(map);
+            map.panTo(e.latlng);
+          })
+          .on('locationerror', (err) => console.warn('Geolocation error', err));
+      }
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(HeaderComp, { title: 'Map Viewer', subtitle: 'Leaflet map with basemaps' }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card mb-lg' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'toolbar' },
+                    React.createElement('select', { className: 'input', value: projectId, onChange: (e) => setProjectId(e.target.value) },
+                      React.createElement('option', { value: '' }, 'Select project…'),
+                      projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_number || '—'} — ${p.project_name}`))
+                    ),
+                    React.createElement('select', { className: 'input', value: drawingId, onChange: (e) => setDrawingId(e.target.value), disabled: !projectId },
+                      React.createElement('option', { value: '' }, projectId ? 'Select drawing…' : 'Select project first'),
+                      drawings.map(d => React.createElement('option', { key: d.drawing_id, value: d.drawing_id }, `${d.drawing_number || '—'} — ${d.drawing_name}`))
+                    ),
+                    React.createElement('span', { className: 'sep' }),
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: doLocate },
+                      React.createElement('i', { className: 'fas fa-location-crosshairs' }), ' Locate'
+                    )
+                  )
+                )
+              ),
+              React.createElement('div', { className: 'card' },
+                React.createElement('div', { className: 'card-body' },
+                  React.createElement('div', { id: 'map', ref: mapEl })
+                ),
+                React.createElement('div', { className: 'card-footer' },
+                  React.createElement('div', { className: 'statusbar' },
+                    React.createElement('div', null, `Lat: ${mousePos.lat.toFixed(6)}  Lng: ${mousePos.lng.toFixed(6)}`),
+                    React.createElement('div', null, `Zoom: ${zoom}`)
+                  )
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(MapViewer));
+  </script>
+</body>
+</html>
