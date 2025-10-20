@@ -31,25 +31,158 @@
     ));
 
     function PipeNetworkEditor() {
+      const { useState, useEffect, useMemo } = React;
       const [networks, setNetworks] = useState([]);
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState('');
+      const [selected, setSelected] = useState(null);
+      const [detail, setDetail] = useState(null);
+      const [detailError, setDetailError] = useState('');
+      const [loadingDetail, setLoadingDetail] = useState(false);
 
-      const load = async () => {
+      const formatPercent = (value) => (value === null || value === undefined) ? '-' : `${(value * 100).toFixed(2)}%`;
+      const formatNumber = (value) => (value === null || value === undefined) ? '-' : Number(value).toLocaleString();
+
+      const fetchDetail = async (networkId, networkRow) => {
+        if (!networkId) return;
+        if (networkRow) setSelected(networkRow);
+        setLoadingDetail(true);
+        setDetailError('');
+        try {
+          const payload = await API.request('GET', `/pipe-networks/${networkId}/detail`);
+          setDetail(payload);
+        } catch (e) {
+          setDetail(null);
+          setDetailError(e.message || 'Failed to load network details');
+        } finally {
+          setLoadingDetail(false);
+        }
+      };
+
+      const load = async (preserveSelection = false) => {
         setLoading(true); setError('');
-        try { const data = await API.list('/pipe-networks'); setNetworks(data || []); }
-        catch (e) { setError(e.message || 'Failed to load pipe networks'); }
-        finally { setLoading(false); }
+        try {
+          const data = await API.list('/pipe-networks');
+          setNetworks(data || []);
+
+          if (!data || !data.length) {
+            setSelected(null);
+            setDetail(null);
+            return;
+          }
+
+          if (preserveSelection && selected) {
+            const match = data.find(item => item.network_id === selected.network_id);
+            if (match) {
+              await fetchDetail(match.network_id, match);
+              return;
+            }
+          }
+
+          const first = data[0];
+          await fetchDetail(first.network_id, first);
+        } catch (e) {
+          setError(e.message || 'Failed to load pipe networks');
+          setNetworks([]);
+          setSelected(null);
+          setDetail(null);
+        } finally {
+          setLoading(false);
+        }
       };
 
       useEffect(() => { load(); }, []);
 
+      const handleSelect = async (row) => {
+        if (!row) return;
+        if (selected && row.network_id === selected.network_id && detail) return;
+        await fetchDetail(row.network_id, row);
+      };
+
       const columns = [
-        { key: 'name', label: 'Name' },
+        { key: 'name', label: 'Network' },
         { key: 'project_name', label: 'Project' },
         { key: 'pipe_count', label: 'Pipes', format: 'number' },
-        { key: 'created_at', label: 'Created', format: 'date' }
+        { key: 'pipes_below_min', label: 'Below Min', format: 'number' },
+        { key: 'avg_slope', label: 'Avg Slope', render: (value) => formatPercent(value) }
       ];
+
+      const summaryCards = detail ? [
+        { label: 'Total Pipes', value: formatNumber(detail.summary.pipe_count), icon: 'diagram-project' },
+        { label: 'Below Minimum', value: formatNumber(detail.summary.pipes_below_min), icon: 'triangle-exclamation', accent: detail.summary.pipes_below_min ? '#ef4444' : '#22c55e' },
+        { label: 'Average Slope', value: formatPercent(detail.summary.avg_slope), icon: 'percent' },
+        { label: 'Worst Margin', value: detail.summary.worst_margin === null ? '-' : `${(detail.summary.worst_margin * 100).toFixed(2)}%`, icon: 'chart-line', accent: (detail.summary.worst_margin !== null && detail.summary.worst_margin < 0) ? '#ef4444' : '#22c55e' }
+      ] : [];
+
+      const renderSummaryCard = (card, idx) => (
+        React.createElement('div', { key: idx, className: 'card' },
+          React.createElement('div', { className: 'card-body flex items-center justify-between' },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontSize: '0.85rem', color: 'var(--color-text-muted)' } }, card.label),
+              React.createElement('div', { style: { fontSize: '1.6rem', fontWeight: 600 } }, card.value)
+            ),
+            React.createElement('div', {
+              style: {
+                width: '48px',
+                height: '48px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(59,130,246,0.15)',
+                color: card.accent || '#3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }
+            },
+              React.createElement('i', { className: `fas fa-${card.icon}` })
+            )
+          )
+        )
+      );
+
+      const renderPipeRow = (pipe) => {
+        const margin = pipe.slope_margin;
+        const marginClass = margin !== null && margin < 0 ? { color: '#ef4444', fontWeight: 600 } : { color: '#22c55e' };
+        return React.createElement('tr', { key: pipe.pipe_id },
+          React.createElement('td', null, pipe.pipe_id.slice(0, 8) + '…'),
+          React.createElement('td', null, pipe.diameter_mm ? `${Math.round(pipe.diameter_mm)} mm` : '-'),
+          React.createElement('td', null, pipe.material || '-'),
+          React.createElement('td', null, formatPercent(pipe.slope)),
+          React.createElement('td', null, formatPercent(pipe.required_slope)),
+          React.createElement('td', { style: marginClass }, margin === null ? '-' : formatPercent(margin)),
+          React.createElement('td', null, pipe.length_m ? `${pipe.length_m.toFixed(1)} m` : '-'),
+          React.createElement('td', null,
+            React.createElement('span', {
+              style: {
+                display: 'inline-block',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                background: (margin !== null && margin < 0) ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)',
+                color: (margin !== null && margin < 0) ? '#ef4444' : '#22c55e',
+                fontSize: '0.75rem',
+                fontWeight: 600
+              }
+            }, (margin !== null && margin < 0) ? 'Review' : 'OK')
+          )
+        );
+      };
+
+      const renderStructureRow = (structure) => {
+        return React.createElement('tr', { key: structure.structure_id },
+          React.createElement('td', null, structure.structure_id.slice(0, 8) + '…'),
+          React.createElement('td', null, structure.type || '-'),
+          React.createElement('td', null, structure.metadata && structure.metadata.label ? structure.metadata.label : '-'),
+          React.createElement('td', null, structure.rim_elev !== null ? structure.rim_elev.toFixed(2) : '-'),
+          React.createElement('td', null, structure.latitude && structure.longitude ? `${structure.latitude.toFixed(5)}, ${structure.longitude.toFixed(5)}` : '-')
+        );
+      };
+
+      const renderConflict = (conflict) => (
+        React.createElement('li', { key: conflict.conflict_id, style: { marginBottom: '8px' } },
+          React.createElement('strong', null, conflict.description),
+          conflict.company ? ` – ${conflict.company}` : '',
+          conflict.suggestions && conflict.suggestions.length ? React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--color-text-muted)' } }, `Suggestions: ${conflict.suggestions.join('; ')}`) : null
+        )
+      );
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
@@ -60,7 +193,7 @@
                 React.createElement('div', { className: 'card-header' },
                   React.createElement('div', { className: 'card-title' }, 'Networks'),
                   React.createElement('div', null,
-                    React.createElement('button', { className: 'btn btn-secondary', onClick: load },
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: () => load(true) },
                       React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh')
                   )
                 ),
@@ -73,15 +206,66 @@
                       searchable: true,
                       pagination: true,
                       pageSize: 20,
-                      emptyMessage: 'No networks found'
+                      emptyMessage: 'No networks found',
+                      onRowClick: handleSelect
                     })
+              ),
+              selected && React.createElement('div', { className: 'card mt-md' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, selected.name),
+                  React.createElement('div', { className: 'text-muted' }, detail && detail.network ? detail.network.project_name : '')
+                ),
+                detailError && React.createElement('div', { className: 'alert alert-danger mb-md' }, detailError),
+                loadingDetail
+                  ? React.createElement('div', { className: 'text-center p-md' }, 'Loading network detail...')
+                  : detail && React.createElement('div', { className: 'card-body' },
+                      summaryCards.length > 0 && React.createElement('div', { className: 'grid grid-cols-4 gap-md mb-md' }, summaryCards.map(renderSummaryCard)),
+                      detail.pipes && detail.pipes.length > 0 && React.createElement('div', { className: 'mb-lg' },
+                        React.createElement('h3', { style: { marginBottom: '0.5rem' } }, 'Pipes'),
+                        React.createElement('div', { className: 'datatable-container' },
+                          React.createElement('table', { className: 'datatable' },
+                            React.createElement('thead', null,
+                              React.createElement('tr', null,
+                                ['ID', 'Diameter', 'Material', 'Slope', 'Required', 'Margin', 'Length', 'Status'].map((label, idx) => React.createElement('th', { key: idx }, label))
+                              )
+                            ),
+                            React.createElement('tbody', null, detail.pipes.map(renderPipeRow))
+                          )
+                        )
+                      ),
+                      detail.structures && detail.structures.length > 0 && React.createElement('div', { className: 'mb-lg' },
+                        React.createElement('h3', { style: { marginBottom: '0.5rem' } }, 'Structures'),
+                        React.createElement('div', { className: 'datatable-container' },
+                          React.createElement('table', { className: 'datatable' },
+                            React.createElement('thead', null,
+                              React.createElement('tr', null,
+                                ['ID', 'Type', 'Label', 'Rim Elev.', 'Location'].map((label, idx) => React.createElement('th', { key: idx }, label))
+                              )
+                            ),
+                            React.createElement('tbody', null, detail.structures.map(renderStructureRow))
+                          )
+                        )
+                      ),
+                      detail.conflicts && detail.conflicts.length > 0 && React.createElement('div', { className: 'mb-lg' },
+                        React.createElement('h3', null, 'Conflicts'),
+                        React.createElement('ul', { style: { paddingLeft: '18px' } }, detail.conflicts.map(renderConflict))
+                      ),
+                      detail.notes && detail.notes.length > 0 && React.createElement('div', null,
+                        React.createElement('h3', null, 'Project Notes'),
+                        React.createElement('ul', { style: { paddingLeft: '18px' } }, detail.notes.map(note => (
+                          React.createElement('li', { key: note.note_id, style: { marginBottom: '6px' } },
+                            React.createElement('strong', null, note.title),
+                            ` – ${note.text}`
+                          )
+                        )))
+                      )
+                    )
               )
             )
           )
         )
       );
     }
-
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(PipeNetworkEditor));
   </script>
 </body>

@@ -794,7 +794,7 @@ def export_generic(format: str, payload: Dict[str, Any] = None):
     }
 
 # ============================================
-# CIVIL TOOLS STUB ENDPOINTS
+# CIVIL TOOLS ENDPOINTS
 # ============================================
 
 # Pipe Networks
@@ -817,6 +817,13 @@ def get_pipe_network(network_id: str):
     if not network:
         raise HTTPException(status_code=404, detail="Pipe network not found")
     return network
+
+@app.get("/api/pipe-networks/{network_id}/detail")
+def get_pipe_network_detail(network_id: str):
+    detail = database.get_pipe_network_detail(network_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Pipe network not found")
+    return detail
 
 @app.put("/api/pipe-networks/{network_id}")
 def update_pipe_network(network_id: str, payload: PipeNetworkCreate):
@@ -1223,50 +1230,22 @@ def bmps_geojson(
     rows = database.execute_query(query, tuple(params) if params else None)
     return build_feature_collection(rows)
 
-# Validation stubs
+# Validation
 @app.post("/api/validate/pipe-slope")
 def validate_pipe_slope(scope: Dict[str, Any]):
     network_id = scope.get('network_id')
     project_id = scope.get('project_id')
 
-    filters = []
-    params: List[Any] = []
-    if network_id:
-        filters.append("p.network_id = %s")
-        params.append(network_id)
-    if project_id:
-        filters.append("pn.project_id = %s")
-        params.append(project_id)
+    pipes = database.fetch_pipe_slopes(project_id=project_id, network_id=network_id)
 
-    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
-
-    query = f"""
-        SELECT p.pipe_id, p.network_id, pn.name AS network_name,
-               p.diameter_mm, p.slope, p.length_m
-        FROM pipes p
-        LEFT JOIN pipe_networks pn ON p.network_id = pn.network_id
-        {where_clause}
-    """
-    pipes = database.execute_query(query, tuple(params) if params else None)
-
-    def min_slope_required(diameter_mm: Optional[float]) -> Optional[float]:
-        if not diameter_mm:
-            return None
-        diameter_in = diameter_mm / 25.4
-        required = None
-        for size, slope in PIPE_SLOPE_MINIMUMS:
-            if diameter_in >= size:
-                required = slope
-        return required
-
-    results = []
-    violations = []
+    results: List[Dict[str, Any]] = []
+    violations: List[Dict[str, Any]] = []
     for pipe in pipes:
-        required = min_slope_required(pipe.get('diameter_mm'))
+        required = pipe.get('required_slope')
         actual = pipe.get('slope')
         ok = True
         if required is not None and actual is not None:
-            ok = float(actual) >= required
+            ok = actual >= required
         elif required is not None:
             ok = False
 
@@ -1274,10 +1253,14 @@ def validate_pipe_slope(scope: Dict[str, Any]):
             "pipe_id": pipe.get('pipe_id'),
             "network_id": pipe.get('network_id'),
             "network_name": pipe.get('network_name'),
+            "project_id": pipe.get('project_id'),
+            "project_name": pipe.get('project_name'),
             "diameter_mm": pipe.get('diameter_mm'),
             "required_slope": required,
             "actual_slope": actual,
+            "slope_margin": pipe.get('slope_margin'),
             "length_m": pipe.get('length_m'),
+            "status": pipe.get('status'),
             "ok": ok
         }
         results.append(entry)
@@ -1288,9 +1271,14 @@ def validate_pipe_slope(scope: Dict[str, Any]):
     if violations:
         message += f" • {len(violations)} below minimum"
 
-    return {"success": True, "message": message, "results": results, "violations": violations}
+    summary = {
+        "count": len(results),
+        "violations": len(violations),
+        "networks": sorted({(pipe['network_id'], pipe['network_name']) for pipe in pipes}, key=lambda item: item[1])
+    }
 
-@app.post("/api/validate/velocity")
+    return {"success": True, "message": message, "results": results, "violations": violations, "summary": summary}
+
 def validate_velocity(scope: Dict[str, Any]):
     return {"success": False, "message": "Velocity validation not implemented yet", "results": []}
 
@@ -1303,9 +1291,9 @@ def clash_detection(scope: Dict[str, Any]):
 # ============================================
 
 if __name__ == "__main__":
-    print("🚀 Starting ACAD=GIS Enhanced API Server...")
-    print("📡 Server running at: http://localhost:8000")
-    print("📖 API Docs at: http://localhost:8000/docs")
-    print("🔥 Press CTRL+C to stop")
+    print("ðŸš€ Starting ACAD=GIS Enhanced API Server...")
+    print("ðŸ“¡ Server running at: http://localhost:8000")
+    print("ðŸ“– API Docs at: http://localhost:8000/docs")
+    print("ðŸ”¥ Press CTRL+C to stop")
     print("")
     uvicorn.run(app, host="0.0.0.0", port=8000)

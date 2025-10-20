@@ -35,6 +35,7 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 ### Pipe Networks
 - `GET /api/pipe-networks` | `POST /api/pipe-networks`
 - `GET /api/pipe-networks/{id}` | `PUT /api/pipe-networks/{id}` | `DELETE /api/pipe-networks/{id}`
+- `GET /api/pipe-networks/{id}/detail` – summary, pipes, structures, conflicts, notes
 - `GET /api/pipes` | `POST /api/pipes` | `GET/PUT/DELETE /api/pipes/{id}`
 - `GET /api/structures` | `POST /api/structures` | `GET/PUT/DELETE /api/structures/{id}`
 - GeoJSON: `GET /api/pipes/geojson?bbox=&srid=&limit=` | `GET /api/structures/geojson?bbox=&srid=&limit=`

@@ -41,6 +41,33 @@ if missing_vars:
     )
 
 
+def _required_slope_sql(alias: str = "p") -> str:
+    """Return SQL CASE expression for minimum slope based on diameter (inches)."""
+    return f"""
+    CASE
+        WHEN {alias}.diameter_mm IS NULL THEN NULL
+        WHEN ({alias}.diameter_mm / 25.4) >= 24 THEN 0.15
+        WHEN ({alias}.diameter_mm / 25.4) >= 18 THEN 0.19
+        WHEN ({alias}.diameter_mm / 25.4) >= 15 THEN 0.25
+        WHEN ({alias}.diameter_mm / 25.4) >= 12 THEN 0.33
+        WHEN ({alias}.diameter_mm / 25.4) >= 10 THEN 0.28
+        WHEN ({alias}.diameter_mm / 25.4) >= 8 THEN 0.40
+        WHEN ({alias}.diameter_mm / 25.4) >= 6 THEN 0.40
+        WHEN ({alias}.diameter_mm / 25.4) >= 4 THEN 0.50
+        ELSE 0.60
+    END
+    """
+
+
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 @contextmanager
 def get_db_connection():
     """Context manager for database connections."""
@@ -454,12 +481,24 @@ def _execute_update(table: str, pk_column: str, record_id: str, assignments: Lis
     return True
 
 def list_pipe_networks(project_id: Optional[str] = None) -> List[Dict]:
-    """Return pipe networks with counts."""
+    """Return pipe networks with aggregated slope statistics."""
     where = ""
     params: List[Any] = []
     if project_id:
         where = "WHERE pn.project_id = %s"
         params.append(project_id)
+
+    req = _required_slope_sql("p")
+    metrics_subquery = f"""
+        SELECT
+            p.network_id,
+            COUNT(*) AS pipe_count,
+            SUM(CASE WHEN p.slope IS NOT NULL AND ({req}) IS NOT NULL AND p.slope < ({req}) THEN 1 ELSE 0 END) AS pipes_below_min,
+            AVG(p.slope) AS avg_slope,
+            MIN(p.slope - ({req})) AS worst_margin
+        FROM pipes p
+        GROUP BY p.network_id
+    """
 
     query = f"""
         SELECT
@@ -469,15 +508,25 @@ def list_pipe_networks(project_id: Optional[str] = None) -> List[Dict]:
             pn.name,
             pn.description,
             pn.created_at,
-            COUNT(p.pipe_id) AS pipe_count
+            metrics.pipe_count,
+            metrics.pipes_below_min,
+            metrics.avg_slope,
+            metrics.worst_margin
         FROM pipe_networks pn
         LEFT JOIN projects proj ON pn.project_id = proj.project_id
-        LEFT JOIN pipes p ON p.network_id = pn.network_id
+        LEFT JOIN ({metrics_subquery}) metrics ON metrics.network_id = pn.network_id
         {where}
-        GROUP BY pn.network_id, pn.project_id, proj.project_name, pn.name, pn.description, pn.created_at
         ORDER BY pn.created_at DESC NULLS LAST, pn.name
     """
-    return execute_query(query, tuple(params) if params else None)
+    rows = execute_query(query, tuple(params) if params else None)
+    for row in rows:
+        if row.get('pipe_count') is not None:
+            row['pipe_count'] = int(row['pipe_count'])
+        if row.get('pipes_below_min') is not None:
+            row['pipes_below_min'] = int(row['pipes_below_min'])
+        row['avg_slope'] = _to_float(row.get('avg_slope'))
+        row['worst_margin'] = _to_float(row.get('worst_margin'))
+    return rows
 
 def list_structures(network_id: Optional[str] = None, project_id: Optional[str] = None) -> List[Dict]:
     """Return structures with optional filters."""
@@ -513,13 +562,14 @@ def list_structures(network_id: Optional[str] = None, project_id: Optional[str] 
     return execute_query(query, tuple(params) if params else None)
 
 def list_pipes(network_id: Optional[str] = None) -> List[Dict]:
-    """Return pipes with optional network filter."""
+    """Return pipes with optional network filter and slope metrics."""
     where = ""
     params: List[Any] = []
     if network_id:
         where = "WHERE p.network_id = %s"
         params.append(network_id)
 
+    req = _required_slope_sql("p")
     query = f"""
         SELECT
             p.pipe_id,
@@ -530,6 +580,8 @@ def list_pipes(network_id: Optional[str] = None) -> List[Dict]:
             p.diameter_mm,
             p.material,
             p.slope,
+            ({req}) AS required_slope,
+            p.slope - ({req}) AS slope_margin,
             p.length_m,
             p.invert_up,
             p.invert_dn,
@@ -541,7 +593,67 @@ def list_pipes(network_id: Optional[str] = None) -> List[Dict]:
         {where}
         ORDER BY p.diameter_mm DESC NULLS LAST, p.pipe_id
     """
-    return execute_query(query, tuple(params) if params else None)
+    rows = execute_query(query, tuple(params) if params else None)
+    for row in rows:
+        row['slope'] = _to_float(row.get('slope'))
+        row['required_slope'] = _to_float(row.get('required_slope'))
+        row['slope_margin'] = _to_float(row.get('slope_margin'))
+        row['length_m'] = _to_float(row.get('length_m'))
+        row['invert_up'] = _to_float(row.get('invert_up'))
+        row['invert_dn'] = _to_float(row.get('invert_dn'))
+        if row.get('diameter_mm') is not None:
+            row['diameter_mm'] = float(row['diameter_mm'])
+    return rows
+
+
+def fetch_pipe_slopes(project_id: Optional[str] = None, network_id: Optional[str] = None) -> List[Dict]:
+    """Fetch pipe slope details filtered by project or network."""
+    filters = []
+    params: List[Any] = []
+    if project_id:
+        filters.append("pn.project_id = %s")
+        params.append(project_id)
+    if network_id:
+        filters.append("p.network_id = %s")
+        params.append(network_id)
+
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
+    req = _required_slope_sql("p")
+    query = f"""
+        SELECT
+            p.pipe_id,
+            p.network_id,
+            pn.name AS network_name,
+            pn.project_id,
+            proj.project_name,
+            p.diameter_mm,
+            p.material,
+            p.slope,
+            ({req}) AS required_slope,
+            p.slope - ({req}) AS slope_margin,
+            p.length_m,
+            p.invert_up,
+            p.invert_dn,
+            p.status,
+            ST_AsGeoJSON(p.geom) AS geom,
+            p.metadata
+        FROM pipes p
+        LEFT JOIN pipe_networks pn ON p.network_id = pn.network_id
+        LEFT JOIN projects proj ON pn.project_id = proj.project_id
+        {where}
+        ORDER BY proj.project_name, pn.name, p.pipe_id
+    """
+    rows = execute_query(query, tuple(params) if params else None)
+    for row in rows:
+        row['slope'] = _to_float(row.get('slope'))
+        row['required_slope'] = _to_float(row.get('required_slope'))
+        row['slope_margin'] = _to_float(row.get('slope_margin'))
+        row['length_m'] = _to_float(row.get('length_m'))
+        row['invert_up'] = _to_float(row.get('invert_up'))
+        row['invert_dn'] = _to_float(row.get('invert_dn'))
+        if row.get('diameter_mm') is not None:
+            row['diameter_mm'] = float(row['diameter_mm'])
+    return rows
 
 def list_alignments(project_id: Optional[str] = None) -> List[Dict]:
     """Return alignments with optional project filter."""
@@ -896,6 +1008,107 @@ def update_pipe(pipe_id: str, updates: Dict[str, Any]) -> bool:
 
 def delete_pipe(pipe_id: str) -> None:
     execute_query("DELETE FROM pipes WHERE pipe_id = %s", (pipe_id,), fetch=False)
+
+
+def get_pipe_network_detail(network_id: str) -> Optional[Dict]:
+    network = execute_single(
+        """
+        SELECT
+            pn.network_id,
+            pn.project_id,
+            pn.name,
+            pn.description,
+            pn.created_at,
+            proj.project_name,
+            proj.project_number,
+            proj.client_name
+        FROM pipe_networks pn
+        LEFT JOIN projects proj ON pn.project_id = proj.project_id
+        WHERE pn.network_id = %s
+        """,
+        (network_id,)
+    )
+    if not network:
+        return None
+
+    pipes = fetch_pipe_slopes(network_id=network_id)
+    pipe_count = len(pipes)
+    pipes_below_min = sum(
+        1 for p in pipes
+        if p['required_slope'] is not None and p['slope'] is not None and p['slope'] < p['required_slope']
+    )
+    slope_values = [p['slope'] for p in pipes if p['slope'] is not None]
+    avg_slope = sum(slope_values) / len(slope_values) if slope_values else None
+    slope_margins = [p['slope_margin'] for p in pipes if p['slope_margin'] is not None]
+    worst_margin = min(slope_margins) if slope_margins else None
+
+    structures = list_structures(network_id=network_id)
+    for struct in structures:
+        struct['rim_elev'] = _to_float(struct.get('rim_elev'))
+        struct['sump_depth'] = _to_float(struct.get('sump_depth'))
+        geom = struct.pop('geom', None)
+        if geom:
+            try:
+                coords = json.loads(geom)['coordinates']
+                struct['longitude'], struct['latitude'] = coords[0], coords[1]
+            except Exception:
+                struct['longitude'] = struct['latitude'] = None
+
+    conflicts = execute_query(
+        """
+        SELECT
+            c.conflict_id,
+            c.description,
+            c.severity,
+            c.resolved,
+            c.suggestions,
+            ST_AsGeoJSON(c.location) AS location,
+            u.company,
+            u.type,
+            u.status
+        FROM conflicts c
+        LEFT JOIN utilities u ON c.utility_id = u.utility_id
+        WHERE c.project_id = %s
+        ORDER BY c.severity DESC, c.conflict_id
+        """,
+        (network['project_id'],)
+    )
+    for item in conflicts:
+        geom = item.pop('location', None)
+        if geom:
+            try:
+                coords = json.loads(geom)['coordinates']
+                item['longitude'], item['latitude'] = coords[0], coords[1]
+            except Exception:
+                item['longitude'] = item['latitude'] = None
+
+    notes = execute_query(
+        """
+        SELECT note_id, title, category, text, tags, is_standard, updated_at
+        FROM sheet_notes
+        WHERE project_id = %s
+        ORDER BY is_standard DESC, updated_at DESC
+        LIMIT 10
+        """,
+        (network['project_id'],)
+    )
+
+    summary = {
+        'pipe_count': pipe_count,
+        'pipes_below_min': pipes_below_min,
+        'avg_slope': _to_float(avg_slope),
+        'worst_margin': _to_float(worst_margin),
+        'slope_samples': len(slope_values)
+    }
+
+    return {
+        'network': network,
+        'summary': summary,
+        'pipes': pipes,
+        'structures': structures,
+        'conflicts': conflicts,
+        'notes': notes
+    }
 
 
 def get_alignment(alignment_id: str) -> Optional[Dict]:

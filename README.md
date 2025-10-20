@@ -56,6 +56,8 @@ acad-gis/
 - Drawing Browser: `frontend/tools/drawing_browser.html:1`
 - Drawing Importer: `frontend/tools/drawing-importer.html:1`
 - Map Viewer: `frontend/tools/map_viewer.html:1`
+- Pipe Network Viewer (Streamlit): `tools/pipe_network_viewer.py`
+  - Requires `pip install streamlit pandas pydeck`; run with `streamlit run tools/pipe_network_viewer.py`
 
 ## Key Docs
 - `docs/ARCHITECTURE.md` — high-level system and data flow
