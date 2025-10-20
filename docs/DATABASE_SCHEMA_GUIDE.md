@@ -26,7 +26,7 @@
 
 The schema consists of **22 core tables** organized into logical groups.
 
-Note (New): CivilMicroTools introduces additional domain tables for pipe networks, alignments, BMPs, utilities, conflicts, and optional jobs/artifacts. See `docs/CIVILMICROTOOLS_PLAN.md` for DDL outlines and relationships. These tables follow the same conventions (UUID PKs, JSONB metadata, PostGIS geometry, explicit FKs with cascade, and SRID policy consistent with Phase 3).
+Note (New): Civil tools introduce additional domain tables for pipe networks, alignments, BMPs, utilities, conflicts, and optional jobs/artifacts. See `docs/CIVIL_TOOLS_PLAN.md` for DDL outlines and relationships. These tables follow the same conventions (UUID PKs, JSONB metadata, PostGIS geometry, explicit FKs with cascade, and SRID policy consistent with Phase 3).
 
 ### Symbol/Block Management (4 tables)
 - `block_definitions` - Symbol library ✅ **100 symbols**
@@ -817,3 +817,5 @@ FROM block_definitions;
 ---
 
 *This schema supports traditional SQL queries, modern AI/vector operations, and comprehensive test datasets for system validation.*
+
+

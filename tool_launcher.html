@@ -167,20 +167,16 @@
         }
 
         function StatCard({ icon, label, value, color = 'blue' }) {
-            const colors = {
+            const palette = {
                 blue: { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6' },
                 green: { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981' },
                 orange: { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b' },
-                purple: { bg: 'rgba(168, 85, 247, 0.2)', text: '#a855f7' }
+                purple: { bg: 'rgba(168, 85, 247, 0.2)', text: '#a855f7' },
+                red: { bg: 'rgba(239, 68, 68, 0.2)', text: '#ef4444' },
+                gray: { bg: 'rgba(148, 163, 184, 0.2)', text: '#94a3b8' }
             };
 
-            const colorStyle = colors[color  ,{id:'pipe-network-editor',name:'Pipe Network Editor',description:'Manage pipe networks (stub)',icon:'diagram-project',url:'frontend/tools/pipe-network-editor.html',color:'blue',badge:'New'}
-            ,{id:'alignment-editor',name:'Alignment Editor',description:'Manage road alignments (stub)',icon:'road',url:'frontend/tools/alignment-editor.html',color:'green',badge:'New'}
-            ,{id:'bmp-manager',name:'BMP Manager',description:'Track stormwater BMPs (stub)',icon:'water',url:'frontend/tools/bmp-manager.html',color:'orange',badge:'New'}
-            ,{id:'utility-coordination',name:'Utility Coordination',description:'Requests, responses, conflicts (stub)',icon:'bolt',url:'frontend/tools/utility-coordination.html',color:'purple',badge:'New'}
-            ,{id:'plot-profile-manager',name:'Plot & Profile Manager',description:'Export DXF/LandXML/SVG (stub)',icon:'file-export',url:'frontend/tools/plot-profile-manager.html',color:'blue',badge:'New'}
-            ,{id:'sheet-note-manager',name:'Sheet Note Manager',description:'Standardized notes across sheets (stub)',icon:'note-sticky',url:'frontend/tools/sheet-note-manager.html',color:'gray',badge:'New'}
-        ];
+            const colorStyle = palette[color] || palette.blue;
 
             return (
                 <div className="card">
@@ -248,7 +244,7 @@
                 name: 'Project Manager',
                 description: 'Create, edit, and manage projects. Organize your drawings and track project information.',
                 icon: 'folder-open',
-                url: 'frontend/tools/project_manager.html',
+                url: 'frontend/tools/project-manager.html',
                 color: 'blue',
                 badge: 'Core'
             },
@@ -275,7 +271,7 @@
                 name: 'Drawing Importer',
                 description: 'Upload and import DXF files. Configure georeferencing and process CAD drawings.',
                 icon: 'file-upload',
-                url: 'frontend/tools/drawing_importer.html',
+                url: 'frontend/tools/drawing-importer.html',
                 color: 'orange',
                 badge: 'Import'
             },
@@ -287,13 +283,61 @@
                 url: 'frontend/tools/symbol_library.html',
                 color: 'red',
                 badge: 'Coming Soon'
+            },
+            {
+                id: 'pipe-network-editor',
+                name: 'Pipe Network Editor',
+                description: 'Manage pipe networks (in progress).',
+                icon: 'diagram-project',
+                url: 'frontend/tools/pipe-network-editor.html',
+                color: 'blue',
+                badge: 'New'
+            },
+            {
+                id: 'alignment-editor',
+                name: 'Alignment Editor',
+                description: 'Manage horizontal and vertical alignments.',
+                icon: 'road',
+                url: 'frontend/tools/alignment-editor.html',
+                color: 'green',
+                badge: 'New'
+            },
+            {
+                id: 'bmp-manager',
+                name: 'BMP Manager',
+                description: 'Track stormwater BMPs, inspections, and maintenance.',
+                icon: 'water',
+                url: 'frontend/tools/bmp-manager.html',
+                color: 'orange',
+                badge: 'New'
+            },
+            {
+                id: 'utility-coordination',
+                name: 'Utility Coordination',
+                description: 'Manage utility requests and conflict tracking.',
+                icon: 'bolt',
+                url: 'frontend/tools/utility-coordination.html',
+                color: 'purple',
+                badge: 'New'
+            },
+            {
+                id: 'plot-profile-manager',
+                name: 'Plot & Profile Manager',
+                description: 'Configure exports (DXF, LandXML, SVG, JSON).',
+                icon: 'file-export',
+                url: 'frontend/tools/plot-profile-manager.html',
+                color: 'blue',
+                badge: 'New'
+            },
+            {
+                id: 'sheet-note-manager',
+                name: 'Sheet Note Manager',
+                description: 'Maintain standardized sheet notes.',
+                icon: 'note-sticky',
+                url: 'frontend/tools/sheet-note-manager.html',
+                color: 'gray',
+                badge: 'New'
             }
-          ,{id:'pipe-network-editor',name:'Pipe Network Editor',description:'Manage pipe networks (stub)',icon:'diagram-project',url:'frontend/tools/pipe-network-editor.html',color:'blue',badge:'New'}
-            ,{id:'alignment-editor',name:'Alignment Editor',description:'Manage road alignments (stub)',icon:'road',url:'frontend/tools/alignment-editor.html',color:'green',badge:'New'}
-            ,{id:'bmp-manager',name:'BMP Manager',description:'Track stormwater BMPs (stub)',icon:'water',url:'frontend/tools/bmp-manager.html',color:'orange',badge:'New'}
-            ,{id:'utility-coordination',name:'Utility Coordination',description:'Requests, responses, conflicts (stub)',icon:'bolt',url:'frontend/tools/utility-coordination.html',color:'purple',badge:'New'}
-            ,{id:'plot-profile-manager',name:'Plot & Profile Manager',description:'Export DXF/LandXML/SVG (stub)',icon:'file-export',url:'frontend/tools/plot-profile-manager.html',color:'blue',badge:'New'}
-            ,{id:'sheet-note-manager',name:'Sheet Note Manager',description:'Standardized notes across sheets (stub)',icon:'note-sticky',url:'frontend/tools/sheet-note-manager.html',color:'gray',badge:'New'}
         ];
 
         function ToolLauncher() {
@@ -310,13 +354,7 @@
                     const statsData = await api.get('/stats');
                     setStats(statsData);
                     
-                    const activity = [  ,{id:'pipe-network-editor',name:'Pipe Network Editor',description:'Manage pipe networks (stub)',icon:'diagram-project',url:'frontend/tools/pipe-network-editor.html',color:'blue',badge:'New'}
-            ,{id:'alignment-editor',name:'Alignment Editor',description:'Manage road alignments (stub)',icon:'road',url:'frontend/tools/alignment-editor.html',color:'green',badge:'New'}
-            ,{id:'bmp-manager',name:'BMP Manager',description:'Track stormwater BMPs (stub)',icon:'water',url:'frontend/tools/bmp-manager.html',color:'orange',badge:'New'}
-            ,{id:'utility-coordination',name:'Utility Coordination',description:'Requests, responses, conflicts (stub)',icon:'bolt',url:'frontend/tools/utility-coordination.html',color:'purple',badge:'New'}
-            ,{id:'plot-profile-manager',name:'Plot & Profile Manager',description:'Export DXF/LandXML/SVG (stub)',icon:'file-export',url:'frontend/tools/plot-profile-manager.html',color:'blue',badge:'New'}
-            ,{id:'sheet-note-manager',name:'Sheet Note Manager',description:'Standardized notes across sheets (stub)',icon:'note-sticky',url:'frontend/tools/sheet-note-manager.html',color:'gray',badge:'New'}
-        ];
+                    const activity = [];
                     if (statsData.recent_drawings && statsData.recent_drawings.length > 0) {
                         statsData.recent_drawings.slice(0, 3).forEach(drawing => {
                             activity.push({
@@ -358,15 +396,10 @@
                     green: { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981' },
                     orange: { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b' },
                     purple: { bg: 'rgba(168, 85, 247, 0.2)', text: '#a855f7' },
-                    red: { bg: 'rgba(239, 68, 68, 0.2)', text: '#ef4444' }
+                    red: { bg: 'rgba(239, 68, 68, 0.2)', text: '#ef4444' },
+                    gray: { bg: 'rgba(148, 163, 184, 0.2)', text: '#94a3b8' }
                 };
-                return colors[color  ,{id:'pipe-network-editor',name:'Pipe Network Editor',description:'Manage pipe networks (stub)',icon:'diagram-project',url:'frontend/tools/pipe-network-editor.html',color:'blue',badge:'New'}
-            ,{id:'alignment-editor',name:'Alignment Editor',description:'Manage road alignments (stub)',icon:'road',url:'frontend/tools/alignment-editor.html',color:'green',badge:'New'}
-            ,{id:'bmp-manager',name:'BMP Manager',description:'Track stormwater BMPs (stub)',icon:'water',url:'frontend/tools/bmp-manager.html',color:'orange',badge:'New'}
-            ,{id:'utility-coordination',name:'Utility Coordination',description:'Requests, responses, conflicts (stub)',icon:'bolt',url:'frontend/tools/utility-coordination.html',color:'purple',badge:'New'}
-            ,{id:'plot-profile-manager',name:'Plot & Profile Manager',description:'Export DXF/LandXML/SVG (stub)',icon:'file-export',url:'frontend/tools/plot-profile-manager.html',color:'blue',badge:'New'}
-            ,{id:'sheet-note-manager',name:'Sheet Note Manager',description:'Standardized notes across sheets (stub)',icon:'note-sticky',url:'frontend/tools/sheet-note-manager.html',color:'gray',badge:'New'}
-        ];
+                return colors[color] || colors.blue;
             };
 
             const getBadgeColorClass = (badge) => {
@@ -374,15 +407,10 @@
                     'Core': { bg: 'rgba(16, 185, 129, 0.2)', text: '#10b981', border: 'rgba(16, 185, 129, 0.3)' },
                     'GIS': { bg: 'rgba(59, 130, 246, 0.2)', text: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' },
                     'Import': { bg: 'rgba(245, 158, 11, 0.2)', text: '#f59e0b', border: 'rgba(245, 158, 11, 0.3)' },
-                    'Coming Soon': { bg: 'rgba(148, 163, 184, 0.2)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)' }
+                    'Coming Soon': { bg: 'rgba(148, 163, 184, 0.2)', text: '#94a3b8', border: 'rgba(148, 163, 184, 0.3)' },
+                    'New': { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', border: 'rgba(59, 130, 246, 0.25)' }
                 };
-                return colors[badge] || colors['Core'  ,{id:'pipe-network-editor',name:'Pipe Network Editor',description:'Manage pipe networks (stub)',icon:'diagram-project',url:'frontend/tools/pipe-network-editor.html',color:'blue',badge:'New'}
-            ,{id:'alignment-editor',name:'Alignment Editor',description:'Manage road alignments (stub)',icon:'road',url:'frontend/tools/alignment-editor.html',color:'green',badge:'New'}
-            ,{id:'bmp-manager',name:'BMP Manager',description:'Track stormwater BMPs (stub)',icon:'water',url:'frontend/tools/bmp-manager.html',color:'orange',badge:'New'}
-            ,{id:'utility-coordination',name:'Utility Coordination',description:'Requests, responses, conflicts (stub)',icon:'bolt',url:'frontend/tools/utility-coordination.html',color:'purple',badge:'New'}
-            ,{id:'plot-profile-manager',name:'Plot & Profile Manager',description:'Export DXF/LandXML/SVG (stub)',icon:'file-export',url:'frontend/tools/plot-profile-manager.html',color:'blue',badge:'New'}
-            ,{id:'sheet-note-manager',name:'Sheet Note Manager',description:'Standardized notes across sheets (stub)',icon:'note-sticky',url:'frontend/tools/sheet-note-manager.html',color:'gray',badge:'New'}
-        ];
+                return colors[badge] || colors['Core'];
             };
 
             return (

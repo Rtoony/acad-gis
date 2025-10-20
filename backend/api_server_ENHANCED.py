@@ -12,6 +12,7 @@ import uvicorn
 import os
 import tempfile
 from datetime import datetime
+import json
 
 # Import your database module
 import database
@@ -63,7 +64,7 @@ class DrawingUpdate(BaseModel):
     description: Optional[str] = None
 
 # ============================================
-# CIVILMICROTOOLS MODELS (stubs)
+# CIVIL TOOLS MODELS (stubs)
 # ============================================
 
 class PipeNetworkCreate(BaseModel):
@@ -72,10 +73,14 @@ class PipeNetworkCreate(BaseModel):
     description: Optional[str] = None
 
 class StructureCreate(BaseModel):
+    project_id: Optional[str] = None
     network_id: Optional[str] = None
     type: Optional[str] = None
     rim_elev: Optional[float] = None
     sump_depth: Optional[float] = None
+    geom: Optional[Any] = None
+    srid: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class PipeCreate(BaseModel):
     network_id: Optional[str] = None
@@ -84,27 +89,106 @@ class PipeCreate(BaseModel):
     diameter_mm: Optional[float] = None
     material: Optional[str] = None
     slope: Optional[float] = None
+    length_m: Optional[float] = None
+    invert_up: Optional[float] = None
+    invert_dn: Optional[float] = None
+    status: Optional[str] = None
+    geom: Optional[Any] = None
+    srid: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class AlignmentCreate(BaseModel):
     project_id: Optional[str] = None
     name: Optional[str] = None
     design_speed: Optional[float] = None
+    classification: Optional[str] = None
+    srid: Optional[int] = None
+    station_start: Optional[float] = None
+    geom: Optional[Any] = None
 
 class BMPCreate(BaseModel):
     project_id: Optional[str] = None
     type: Optional[str] = None
     area_acres: Optional[float] = None
     drainage_area_acres: Optional[float] = None
+    install_date: Optional[str] = None
+    status: Optional[str] = None
+    compliance: Optional[str] = None
+    geom: Optional[Any] = None
+    srid: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class UtilityCreate(BaseModel):
     project_id: Optional[str] = None
     company: Optional[str] = None
     type: Optional[str] = None
+    status: Optional[str] = None
+    request_date: Optional[str] = None
+    response_date: Optional[str] = None
+    contact: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class ConflictCreate(BaseModel):
     project_id: Optional[str] = None
     utility_id: Optional[str] = None
     description: Optional[str] = None
+    severity: Optional[str] = None
+    resolved: Optional[bool] = None
+    suggestions: Optional[List[str]] = None
+    location: Optional[Any] = None
+    geom: Optional[Any] = None
+    srid: Optional[int] = None
+
+# ============================================
+# HELPERS
+# ============================================
+
+def parse_bbox(bbox: Optional[str]) -> Optional[tuple]:
+    if not bbox:
+        return None
+    try:
+        parts = [float(part.strip()) for part in bbox.split(',')]
+        if len(parts) != 4:
+            raise ValueError
+        return tuple(parts)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid bbox. Use minx,miny,maxx,maxy")
+
+
+def build_feature_collection(rows: List[Dict[str, Any]], geom_field: str = 'geom') -> Dict[str, Any]:
+    features = []
+    for row in rows:
+        geometry_raw = row.get(geom_field)
+        geometry = None
+        if geometry_raw:
+            if isinstance(geometry_raw, str):
+                try:
+                    geometry = json.loads(geometry_raw)
+                except json.JSONDecodeError:
+                    geometry = None
+            elif isinstance(geometry_raw, dict):
+                geometry = geometry_raw
+
+        properties = {k: v for k, v in row.items() if k != geom_field}
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": properties
+        })
+
+    return {"type": "FeatureCollection", "features": features}
+
+
+PIPE_SLOPE_MINIMUMS = [
+    (4, 0.50),
+    (6, 0.40),
+    (8, 0.40),
+    (10, 0.28),
+    (12, 0.33),
+    (15, 0.25),
+    (18, 0.19),
+    (24, 0.15)
+]
 
 # ============================================
 # HEALTH CHECK
@@ -710,211 +794,509 @@ def export_generic(format: str, payload: Dict[str, Any] = None):
     }
 
 # ============================================
-# CIVILMICROTOOLS STUB ENDPOINTS
+# CIVIL TOOLS STUB ENDPOINTS
 # ============================================
 
 # Pipe Networks
 @app.get("/api/pipe-networks")
-def list_pipe_networks():
-    return []
+def list_pipe_networks(project_id: Optional[str] = None):
+    return database.list_pipe_networks(project_id)
 
 @app.post("/api/pipe-networks")
 def create_pipe_network(payload: PipeNetworkCreate):
-    return {"network_id": "stub", "message": "Pipe network creation stub"}
+    network_id = database.create_pipe_network(
+        payload.project_id,
+        payload.name,
+        payload.description
+    )
+    return {"network_id": network_id}
 
 @app.get("/api/pipe-networks/{network_id}")
 def get_pipe_network(network_id: str):
-    return {"network_id": network_id, "message": "Pipe network get stub"}
+    network = database.get_pipe_network(network_id)
+    if not network:
+        raise HTTPException(status_code=404, detail="Pipe network not found")
+    return network
 
 @app.put("/api/pipe-networks/{network_id}")
 def update_pipe_network(network_id: str, payload: PipeNetworkCreate):
-    return {"network_id": network_id, "message": "Pipe network update stub"}
+    updated = database.update_pipe_network(network_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"network_id": network_id, "updated": True}
 
 @app.delete("/api/pipe-networks/{network_id}")
 def delete_pipe_network(network_id: str):
-    return {"network_id": network_id, "message": "Pipe network delete stub"}
+    database.delete_pipe_network(network_id)
+    return {"network_id": network_id, "deleted": True}
 
 # Pipes
 @app.get("/api/pipes")
-def list_pipes():
-    return []
+def list_pipes(network_id: Optional[str] = None):
+    return database.list_pipes(network_id)
 
 @app.post("/api/pipes")
 def create_pipe(payload: PipeCreate):
-    return {"pipe_id": "stub", "message": "Pipe creation stub"}
+    pipe_id = database.create_pipe(
+        payload.network_id,
+        payload.up_structure_id,
+        payload.down_structure_id,
+        payload.diameter_mm,
+        payload.material,
+        payload.slope,
+        payload.length_m,
+        payload.invert_up,
+        payload.invert_dn,
+        payload.status,
+        payload.geom,
+        payload.srid,
+        payload.metadata
+    )
+    return {"pipe_id": pipe_id}
 
 @app.get("/api/pipes/{pipe_id}")
 def get_pipe(pipe_id: str):
-    return {"pipe_id": pipe_id, "message": "Pipe get stub"}
+    pipe = database.get_pipe(pipe_id)
+    if not pipe:
+        raise HTTPException(status_code=404, detail="Pipe not found")
+    return pipe
 
 @app.put("/api/pipes/{pipe_id}")
 def update_pipe(pipe_id: str, payload: PipeCreate):
-    return {"pipe_id": pipe_id, "message": "Pipe update stub"}
+    updated = database.update_pipe(pipe_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"pipe_id": pipe_id, "updated": True}
 
 @app.delete("/api/pipes/{pipe_id}")
 def delete_pipe(pipe_id: str):
-    return {"pipe_id": pipe_id, "message": "Pipe delete stub"}
+    database.delete_pipe(pipe_id)
+    return {"pipe_id": pipe_id, "deleted": True}
 
 # Structures
 @app.get("/api/structures")
-def list_structures():
-    return []
+def list_structures(network_id: Optional[str] = None, project_id: Optional[str] = None):
+    return database.list_structures(network_id=network_id, project_id=project_id)
 
 @app.post("/api/structures")
 def create_structure(payload: StructureCreate):
-    return {"structure_id": "stub", "message": "Structure creation stub"}
+    structure_id = database.create_structure(
+        payload.project_id,
+        payload.network_id,
+        payload.type,
+        payload.rim_elev,
+        payload.sump_depth,
+        payload.geom,
+        payload.srid,
+        payload.metadata
+    )
+    return {"structure_id": structure_id}
 
 @app.get("/api/structures/{structure_id}")
 def get_structure(structure_id: str):
-    return {"structure_id": structure_id, "message": "Structure get stub"}
+    structure = database.get_structure(structure_id)
+    if not structure:
+        raise HTTPException(status_code=404, detail="Structure not found")
+    return structure
 
 @app.put("/api/structures/{structure_id}")
 def update_structure(structure_id: str, payload: StructureCreate):
-    return {"structure_id": structure_id, "message": "Structure update stub"}
+    updated = database.update_structure(structure_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"structure_id": structure_id, "updated": True}
 
 @app.delete("/api/structures/{structure_id}")
 def delete_structure(structure_id: str):
-    return {"structure_id": structure_id, "message": "Structure delete stub"}
+    database.delete_structure(structure_id)
+    return {"structure_id": structure_id, "deleted": True}
 
 # Alignments
 @app.get("/api/alignments")
-def list_alignments():
-    return []
+def list_alignments(project_id: Optional[str] = None):
+    return database.list_alignments(project_id)
 
 @app.post("/api/alignments")
 def create_alignment(payload: AlignmentCreate):
-    return {"alignment_id": "stub", "message": "Alignment creation stub"}
+    alignment_id = database.create_alignment(
+        payload.project_id,
+        payload.name,
+        payload.design_speed,
+        payload.classification,
+        payload.srid,
+        payload.station_start,
+        payload.geom
+    )
+    return {"alignment_id": alignment_id}
 
 @app.get("/api/alignments/{alignment_id}")
 def get_alignment(alignment_id: str):
-    return {"alignment_id": alignment_id, "message": "Alignment get stub"}
+    alignment = database.get_alignment(alignment_id)
+    if not alignment:
+        raise HTTPException(status_code=404, detail="Alignment not found")
+    alignment['horizontal_elements'] = database.list_horizontal_elements(alignment_id)
+    alignment['vertical_elements'] = database.list_vertical_elements(alignment_id)
+    return alignment
 
 @app.put("/api/alignments/{alignment_id}")
 def update_alignment(alignment_id: str, payload: AlignmentCreate):
-    return {"alignment_id": alignment_id, "message": "Alignment update stub"}
+    updated = database.update_alignment(alignment_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"alignment_id": alignment_id, "updated": True}
 
 @app.delete("/api/alignments/{alignment_id}")
 def delete_alignment(alignment_id: str):
-    return {"alignment_id": alignment_id, "message": "Alignment delete stub"}
+    database.delete_alignment(alignment_id)
+    return {"alignment_id": alignment_id, "deleted": True}
 
 @app.get("/api/alignments/{alignment_id}/horizontal-elements")
 def list_horizontal_elements(alignment_id: str):
-    return []
+    return database.list_horizontal_elements(alignment_id)
 
 @app.post("/api/alignments/{alignment_id}/horizontal-elements")
 def create_horizontal_element(alignment_id: str, payload: Dict[str, Any]):
-    return {"element_id": "stub", "message": "Horizontal element creation stub"}
+    element_id = database.create_horizontal_element(alignment_id, payload)
+    return {"element_id": element_id}
 
 @app.get("/api/alignments/{alignment_id}/vertical-elements")
 def list_vertical_elements(alignment_id: str):
-    return []
+    return database.list_vertical_elements(alignment_id)
 
 @app.post("/api/alignments/{alignment_id}/vertical-elements")
 def create_vertical_element(alignment_id: str, payload: Dict[str, Any]):
-    return {"element_id": "stub", "message": "Vertical element creation stub"}
+    element_id = database.create_vertical_element(alignment_id, payload)
+    return {"element_id": element_id}
 
 # BMPs
 @app.get("/api/bmps")
-def list_bmps():
-    return []
+def list_bmps(project_id: Optional[str] = None):
+    return database.list_bmps(project_id)
 
 @app.post("/api/bmps")
 def create_bmp(payload: BMPCreate):
-    return {"bmp_id": "stub", "message": "BMP creation stub"}
+    bmp_id = database.create_bmp(
+        payload.project_id,
+        payload.type,
+        payload.area_acres,
+        payload.drainage_area_acres,
+        payload.install_date,
+        payload.status,
+        payload.compliance,
+        payload.geom,
+        payload.srid,
+        payload.metadata
+    )
+    return {"bmp_id": bmp_id}
 
 @app.get("/api/bmps/{bmp_id}")
 def get_bmp(bmp_id: str):
-    return {"bmp_id": bmp_id, "message": "BMP get stub"}
+    bmp = database.get_bmp(bmp_id)
+    if not bmp:
+        raise HTTPException(status_code=404, detail="BMP not found")
+    bmp['inspections'] = database.list_inspections(bmp_id)
+    bmp['maintenance'] = database.list_maintenance_records(bmp_id)
+    return bmp
 
 @app.put("/api/bmps/{bmp_id}")
 def update_bmp(bmp_id: str, payload: BMPCreate):
-    return {"bmp_id": bmp_id, "message": "BMP update stub"}
+    updated = database.update_bmp(bmp_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"bmp_id": bmp_id, "updated": True}
 
 @app.delete("/api/bmps/{bmp_id}")
 def delete_bmp(bmp_id: str):
-    return {"bmp_id": bmp_id, "message": "BMP delete stub"}
+    database.delete_bmp(bmp_id)
+    return {"bmp_id": bmp_id, "deleted": True}
 
 @app.get("/api/bmps/{bmp_id}/inspections")
 def list_bmp_inspections(bmp_id: str):
-    return []
+    return database.list_inspections(bmp_id)
 
 @app.post("/api/bmps/{bmp_id}/inspections")
 def create_bmp_inspection(bmp_id: str, payload: Dict[str, Any]):
-    return {"inspection_id": "stub", "message": "BMP inspection creation stub"}
+    inspection_id = database.create_inspection_record(bmp_id, payload)
+    return {"inspection_id": inspection_id}
 
 @app.get("/api/bmps/{bmp_id}/maintenance")
 def list_bmp_maintenance(bmp_id: str):
-    return []
+    return database.list_maintenance_records(bmp_id)
 
 @app.post("/api/bmps/{bmp_id}/maintenance")
 def create_bmp_maintenance(bmp_id: str, payload: Dict[str, Any]):
-    return {"record_id": "stub", "message": "BMP maintenance creation stub"}
+    record_id = database.create_maintenance_record(bmp_id, payload)
+    return {"record_id": record_id}
 
 # Utilities & Conflicts
 @app.get("/api/utilities")
-def list_utilities():
-    return []
+def list_utilities(project_id: Optional[str] = None):
+    return database.list_utilities(project_id)
 
 @app.post("/api/utilities")
 def create_utility(payload: UtilityCreate):
-    return {"utility_id": "stub", "message": "Utility creation stub"}
+    utility_id = database.create_utility(
+        payload.project_id,
+        payload.company,
+        payload.type,
+        payload.status,
+        payload.request_date,
+        payload.response_date,
+        payload.contact,
+        payload.metadata
+    )
+    return {"utility_id": utility_id}
 
 @app.get("/api/utilities/{utility_id}")
 def get_utility(utility_id: str):
-    return {"utility_id": utility_id, "message": "Utility get stub"}
+    utility = database.get_utility(utility_id)
+    if not utility:
+        raise HTTPException(status_code=404, detail="Utility not found")
+    return utility
 
 @app.put("/api/utilities/{utility_id}")
 def update_utility(utility_id: str, payload: UtilityCreate):
-    return {"utility_id": utility_id, "message": "Utility update stub"}
+    updated = database.update_utility(utility_id, payload.dict(exclude_unset=True))
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"utility_id": utility_id, "updated": True}
 
 @app.delete("/api/utilities/{utility_id}")
 def delete_utility(utility_id: str):
-    return {"utility_id": utility_id, "message": "Utility delete stub"}
+    database.delete_utility(utility_id)
+    return {"utility_id": utility_id, "deleted": True}
 
 @app.get("/api/conflicts")
-def list_conflicts():
-    return []
+def list_conflicts(project_id: Optional[str] = None, utility_id: Optional[str] = None):
+    return database.list_conflicts(project_id=project_id, utility_id=utility_id)
 
 @app.post("/api/conflicts")
 def create_conflict(payload: ConflictCreate):
-    return {"conflict_id": "stub", "message": "Conflict creation stub"}
+    conflict_id = database.create_conflict_record(payload.dict(exclude_unset=True))
+    return {"conflict_id": conflict_id}
 
 @app.put("/api/conflicts/{conflict_id}")
 def update_conflict(conflict_id: str, payload: Dict[str, Any]):
-    return {"conflict_id": conflict_id, "message": "Conflict update stub"}
+    updated = database.update_conflict(conflict_id, payload)
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"conflict_id": conflict_id, "updated": True}
+
+@app.get("/api/sheet-notes")
+def list_sheet_notes(project_id: Optional[str] = None):
+    return database.list_sheet_notes(project_id)
 
 # GeoJSON endpoints (empty feature collections)
-def _empty_fc():
-    return {"type": "FeatureCollection", "features": []}
-
 @app.get("/api/pipes/geojson")
-def pipes_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, limit: Optional[int] = None):
-    return _empty_fc()
+def pipes_geojson(
+    bbox: Optional[str] = None,
+    srid: Optional[int] = None,
+    limit: Optional[int] = None,
+    network_id: Optional[str] = None
+):
+    filters = []
+    params: List[Any] = []
+
+    if network_id:
+        filters.append("p.network_id = %s")
+        params.append(network_id)
+
+    bbox_values = parse_bbox(bbox)
+    if bbox_values:
+        minx, miny, maxx, maxy = bbox_values
+        filters.append("p.geom && ST_MakeEnvelope(%s, %s, %s, %s, %s)")
+        params.extend([minx, miny, maxx, maxy, srid or 3857])
+
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    query = f"""
+        SELECT
+            p.pipe_id,
+            p.network_id,
+            p.diameter_mm,
+            p.material,
+            p.slope,
+            p.length_m,
+            p.status,
+            ST_AsGeoJSON(p.geom) AS geom
+        FROM pipes p
+        {where_clause}
+        ORDER BY p.pipe_id
+    """
+    if limit:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    rows = database.execute_query(query, tuple(params) if params else None)
+    return build_feature_collection(rows)
 
 @app.get("/api/structures/geojson")
-def structures_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, limit: Optional[int] = None):
-    return _empty_fc()
+def structures_geojson(
+    bbox: Optional[str] = None,
+    srid: Optional[int] = None,
+    limit: Optional[int] = None,
+    network_id: Optional[str] = None
+):
+    filters = []
+    params: List[Any] = []
+
+    if network_id:
+        filters.append("s.network_id = %s")
+        params.append(network_id)
+
+    bbox_values = parse_bbox(bbox)
+    if bbox_values:
+        minx, miny, maxx, maxy = bbox_values
+        filters.append("s.geom && ST_MakeEnvelope(%s, %s, %s, %s, %s)")
+        params.extend([minx, miny, maxx, maxy, srid or 3857])
+
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    query = f"""
+        SELECT
+            s.structure_id,
+            s.network_id,
+            s.type,
+            s.rim_elev,
+            s.sump_depth,
+            ST_AsGeoJSON(s.geom) AS geom
+        FROM structures s
+        {where_clause}
+        ORDER BY s.structure_id
+    """
+    if limit:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    rows = database.execute_query(query, tuple(params) if params else None)
+    return build_feature_collection(rows)
 
 @app.get("/api/alignments/{alignment_id}/geojson")
 def alignment_geojson(alignment_id: str):
-    return _empty_fc()
+    alignment = database.get_alignment(alignment_id)
+    if not alignment:
+        raise HTTPException(status_code=404, detail="Alignment not found")
+    return build_feature_collection([alignment])
 
 @app.get("/api/bmps/geojson")
-def bmps_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, type: Optional[str] = None):
-    return _empty_fc()
+def bmps_geojson(
+    bbox: Optional[str] = None,
+    srid: Optional[int] = None,
+    type: Optional[str] = None,
+    project_id: Optional[str] = None
+):
+    filters = []
+    params: List[Any] = []
+
+    if project_id:
+        filters.append("b.project_id = %s")
+        params.append(project_id)
+
+    if type:
+        filters.append("b.type = %s")
+        params.append(type)
+
+    bbox_values = parse_bbox(bbox)
+    if bbox_values:
+        minx, miny, maxx, maxy = bbox_values
+        filters.append("b.geom && ST_MakeEnvelope(%s, %s, %s, %s, %s)")
+        params.extend([minx, miny, maxx, maxy, srid or 3857])
+
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    query = f"""
+        SELECT
+            b.bmp_id,
+            b.project_id,
+            b.type,
+            b.status,
+            b.compliance,
+            ST_AsGeoJSON(b.geom) AS geom
+        FROM bmps b
+        {where_clause}
+        ORDER BY b.bmp_id
+    """
+    if limit:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    rows = database.execute_query(query, tuple(params) if params else None)
+    return build_feature_collection(rows)
 
 # Validation stubs
 @app.post("/api/validate/pipe-slope")
 def validate_pipe_slope(scope: Dict[str, Any]):
-    return {"success": True, "message": "Validation stub: pipe slope", "results": []}
+    network_id = scope.get('network_id')
+    project_id = scope.get('project_id')
+
+    filters = []
+    params: List[Any] = []
+    if network_id:
+        filters.append("p.network_id = %s")
+        params.append(network_id)
+    if project_id:
+        filters.append("pn.project_id = %s")
+        params.append(project_id)
+
+    where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+    query = f"""
+        SELECT p.pipe_id, p.network_id, pn.name AS network_name,
+               p.diameter_mm, p.slope, p.length_m
+        FROM pipes p
+        LEFT JOIN pipe_networks pn ON p.network_id = pn.network_id
+        {where_clause}
+    """
+    pipes = database.execute_query(query, tuple(params) if params else None)
+
+    def min_slope_required(diameter_mm: Optional[float]) -> Optional[float]:
+        if not diameter_mm:
+            return None
+        diameter_in = diameter_mm / 25.4
+        required = None
+        for size, slope in PIPE_SLOPE_MINIMUMS:
+            if diameter_in >= size:
+                required = slope
+        return required
+
+    results = []
+    violations = []
+    for pipe in pipes:
+        required = min_slope_required(pipe.get('diameter_mm'))
+        actual = pipe.get('slope')
+        ok = True
+        if required is not None and actual is not None:
+            ok = float(actual) >= required
+        elif required is not None:
+            ok = False
+
+        entry = {
+            "pipe_id": pipe.get('pipe_id'),
+            "network_id": pipe.get('network_id'),
+            "network_name": pipe.get('network_name'),
+            "diameter_mm": pipe.get('diameter_mm'),
+            "required_slope": required,
+            "actual_slope": actual,
+            "length_m": pipe.get('length_m'),
+            "ok": ok
+        }
+        results.append(entry)
+        if not ok:
+            violations.append(entry)
+
+    message = f"Checked {len(results)} pipes"
+    if violations:
+        message += f" • {len(violations)} below minimum"
+
+    return {"success": True, "message": message, "results": results, "violations": violations}
 
 @app.post("/api/validate/velocity")
 def validate_velocity(scope: Dict[str, Any]):
-    return {"success": True, "message": "Validation stub: velocity", "results": []}
+    return {"success": False, "message": "Velocity validation not implemented yet", "results": []}
 
 @app.post("/api/clash-detection")
 def clash_detection(scope: Dict[str, Any]):
-    return {"success": True, "message": "Clash detection stub", "conflicts": []}
+    return {"success": False, "message": "Clash detection not implemented yet", "conflicts": []}
 
 # ============================================
 # RUN SERVER

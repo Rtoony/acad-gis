@@ -36,7 +36,7 @@
 ### What's Working (October 19, 2025)
 
 ✅ **Backend:**
-- FastAPI server running on port 5000
+- FastAPI server running on port 8000
 - PostgreSQL database with PostGIS on Supabase
 - 22 tables with full schema
 - CRUD operations for projects, drawings, blocks, layers
@@ -97,8 +97,8 @@ State:          React useState (local only)
 API Calls:      Fetch API
 ```
 
-### CivilMicroTools (Inspiration)
-Data-first civil tools (Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager) are proposed to sit alongside existing tools. They treat the database as the system of record and generate CAD/GIS exports (DXF/LandXML/SVG/JSON/CSV). See `docs/CIVILMICROTOOLS_PLAN.md`.
+### Civil Tools (Inspiration/Integration)
+Data-first civil tools (Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager) are proposed to sit alongside existing tools. They treat the database as the system of record and generate CAD/GIS exports (DXF/LandXML/SVG/JSON/CSV). See `docs/CIVIL_TOOLS_PLAN.md`.
 
 ### Development Environment
 ```
@@ -117,7 +117,7 @@ Python Env:     venv (not conda/poetry)
 ```
 User Browser
     ↕ HTTP/JSON
-FastAPI Server (port 5000)
+FastAPI Server (port 8000)
     ↕ SQL
 PostgreSQL/PostGIS (Supabase)
 ```
@@ -227,7 +227,7 @@ PostgreSQL/PostGIS (Supabase)
 
 ### Base URL
 ```
-http://localhost:5000
+http://localhost:8000
 ```
 
 ### Core Routes
@@ -359,7 +359,7 @@ function ComponentName() {
 ```javascript
 async function fetchProjects() {
   try {
-    const response = await fetch('http://localhost:5000/api/projects');
+    const response = await fetch('http://localhost:8000/api/projects');
     if (!response.ok) throw new Error('Failed to fetch');
     const data = await response.json();
     return data;
@@ -522,7 +522,7 @@ pytest tests/test_api.py
 
 ### Current: Local Development Only
 
-- API runs on localhost:5000
+- API runs on localhost:8000
 - HTML files opened via `file://` or served locally
 - Database on Supabase (already cloud)
 
@@ -606,7 +606,7 @@ Framework:      FastAPI + React (CDN)
 Database:       PostgreSQL 14 + PostGIS (Supabase)
 Location:       ~/projects/acad-gis (WSL)
 GitHub:         https://github.com/Rtoony/acad-gis
-API Port:       5000
+API Port:       8000
 Files:          22 database tables, 6 tools (to be created)
 Current Phase:  Restructuring from monolithic to modular
 ```
@@ -633,3 +633,6 @@ Current Phase:  Restructuring from monolithic to modular
 **Last Updated:** October 19, 2025  
 **Status:** ✅ Environment configured, ready for tool extraction  
 **Next Task:** Create Tool Launcher and extract first mini-tool
+
+
+

@@ -21,18 +21,18 @@ ACAD‑GIS is a web-based system for managing CAD drawings with GIS context. The
 - Frontend: React 18 via CDN, Babel Standalone (for inline JSX), plain HTML files.
 - No build system required; edit files and refresh the browser.
 
-## What’s Working Today
+## What's Working Today
 - FastAPI server with health (`/api/health`) and stats (`/api/stats`).
 - Project and drawing endpoints (basic CRUD patterns present).
 - DXF import/export stubs.
 - Frontend: Tool Launcher, Project Manager, Drawing Browser, Map Viewer.
-- CivilMicroTools (mock): Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager. These call stub endpoints so you can explore UI flows while the schema is planned.
+- Civil tools (beta): Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager. They read from the new civil tables and expose basic CRUD + GeoJSON endpoints (some advanced actions still roadmap items).
 
 ## Where Things Live (Repo Map)
 - Backend (API): `backend/api_server_ENHANCED.py`, DB helpers `backend/database.py`.
 - Frontend (tools): `frontend/tools/*.html` (each tool is its own page).
 - Shared frontend: `frontend/shared/styles.css`, `frontend/shared/components.js`, `frontend/shared/api.js`, `frontend/shared/react-components.js`.
-- Docs: `docs/` (roadmap, setup guides, API, schema, CivilMicroTools plan, this guide).
+- Docs: `docs/` (roadmap, setup guides, API, schema, Civil tools plan, this guide).
 - Prototypes: `prototypes/` (exploration and inspiration code/data).
 
 ## Run It Locally (Dev)
@@ -62,10 +62,10 @@ Tip: You can also launch tools from the cards in `tool_launcher.html`.
 - With no database configured, you can still explore the frontend and mocked civil tools; API health may show “disconnected”.
 - PostGIS should be enabled on your database when spatial data is added later.
 
-## CivilMicroTools (Future, Mocked Now)
+## Civil tools (In Progress)
 - Data-first civil tools inspired by CivilOS: Pipe Networks, Alignments, BMPs, Utilities, Plot/Profile, Sheet Notes.
-- Endpoints exist as stubs so UIs can be prototyped before the database schema is finalized.
-- See `docs/CIVILMICROTOOLS_PLAN.md` for the phased plan and example DDL.
+- CRUD + GeoJSON endpoints are live; slope validation works today, velocity/clash detection remain TODO.
+- See `docs/CIVIL_TOOLS_PLAN.md` for the phased plan and example DDL.
 
 ## Troubleshooting
 - API Offline in launcher: confirm FastAPI is running at `http://localhost:8000` and CORS is allowed (it is by default).
@@ -91,4 +91,5 @@ Tip: You can also launch tools from the cards in `tool_launcher.html`.
 - Civil tools load and show tables (data is mocked for now).
 
 You’re ready to explore. When the schema is finalized, we’ll flip the stubs to real endpoints and wire the tools to the database.
+
 

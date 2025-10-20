@@ -60,10 +60,11 @@ acad-gis/
 ## Key Docs
 - `docs/ARCHITECTURE.md` — high-level system and data flow
 - `docs/DXF_PIPELINE.md` — ingest/normalize pipeline (ezdxf → PostGIS)
-- `docs/CONVERSION_PIPELINE.md` — exports to open formats (GeoJSON/GPKG/MBTiles/SVG/PDF)
-- `docs/GEODESY.md` — CRS/units policy
-- `docs/API.md` — current + planned endpoints
-- `docs/DEVELOPMENT_ROADMAP.md` — backend-first milestones
+- `docs/CONVERSION_PIPELINE.md` - exports to open formats (GeoJSON/GPKG/MBTiles/SVG/PDF)
+- `docs/GEODESY.md` - CRS/units policy
+- `docs/API.md` - current + planned endpoints
+- `docs/DEVELOPMENT_ROADMAP.md` - backend-first milestones
+- `docs/CIVIL_TOOLS_PLAN.md` - phased plan for civil-focused tools
 
 ## Philosophy
 CAD projects are information, not vendor-bound files. Python + PostGIS + open formats can handle the majority of civil/survey workflows without proprietary software.

@@ -27,10 +27,7 @@
 
       const load = async () => {
         setLoading(true); setError('');
-        try { 
-          // Placeholder: no backend yet, keep empty list
-          setNotes([]);
-        }
+        try { const data = await API.list('/sheet-notes'); setNotes(data || []); }
         catch (e) { setError(e.message || 'Failed to load notes'); }
         finally { setLoading(false); }
       };
@@ -38,19 +35,20 @@
       useEffect(() => { load(); }, []);
 
       const columns = [
-        { key: 'note_id', label: 'ID' },
         { key: 'title', label: 'Title' },
+        { key: 'project_name', label: 'Project' },
         { key: 'category', label: 'Category' },
-        { key: 'text', label: 'Text' }
+        { key: 'is_standard', label: 'Standard' },
+        { key: 'updated_at', label: 'Updated', format: 'date' }
       ];
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
           React.createElement('header', { className: 'header' },
             React.createElement('div', { className: 'header-content' },
-              React.createElement('div', { className: 'header-title' },
+                React.createElement('div', { className: 'header-title' },
                 React.createElement('h1', null, 'Sheet Note Manager'),
-                React.createElement('div', { className: 'header-subtitle' }, 'Standardized notes across sheets (stub)')
+                React.createElement('div', { className: 'header-subtitle' }, 'Standardized notes across sheets')
               )
             )
           ),
@@ -86,4 +84,3 @@
   </script>
 </body>
 </html>
-

@@ -1,4 +1,4 @@
-# CivilMicroTools Integration Plan
+# Civil Tools Integration Plan
 
 Last Updated: October 2025
 
@@ -154,4 +154,5 @@ SRID Policy: store native SRID where relevant and provide exchange via `srid` pa
 - CM‑1: Tables + CRUD + GeoJSON + basic validations + simple UIs
 - CM‑2: Map integration + exports + clash detection + artifacts
 - CM‑3: Advanced rules, jobs dashboards, solver prototypes
+
 

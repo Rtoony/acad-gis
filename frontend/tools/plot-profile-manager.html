@@ -27,7 +27,7 @@
       const doExport = async () => {
         try {
           const res = await API.request('POST', `/export/${format}`, { data: { jobName } });
-          alert((res && res.message) || 'Export request sent (stub)');
+          alert((res && res.message) || 'Export request sent');
         } catch (e) {
           alert(e.message || 'Export failed');
         }
@@ -39,7 +39,7 @@
             React.createElement('div', { className: 'header-content' },
               React.createElement('div', { className: 'header-title' },
                 React.createElement('h1', null, 'Plot & Profile Manager'),
-                React.createElement('div', { className: 'header-subtitle' }, 'Export without CAD engine (stub)')
+                React.createElement('div', { className: 'header-subtitle' }, 'Configure exports without a CAD engine')
               )
             )
           ),
@@ -82,4 +82,3 @@
   </script>
 </body>
 </html>
-

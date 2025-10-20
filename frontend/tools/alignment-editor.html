@@ -35,18 +35,21 @@
       useEffect(() => { load(); }, []);
 
       const columns = [
-        { key: 'alignment_id', label: 'ID' },
         { key: 'name', label: 'Name' },
-        { key: 'design_speed', label: 'Design Speed' }
+        { key: 'project_name', label: 'Project' },
+        { key: 'design_speed', label: 'Design Speed' },
+        { key: 'classification', label: 'Class' },
+        { key: 'horizontal_elements', label: 'Horiz Elements', format: 'number' },
+        { key: 'vertical_elements', label: 'Vert Elements', format: 'number' }
       ];
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
           React.createElement('header', { className: 'header' },
             React.createElement('div', { className: 'header-content' },
-              React.createElement('div', { className: 'header-title' },
+                React.createElement('div', { className: 'header-title' },
                 React.createElement('h1', null, 'Alignment Editor'),
-                React.createElement('div', { className: 'header-subtitle' }, 'Manage alignments (stub)')
+                React.createElement('div', { className: 'header-subtitle' }, 'Manage horizontal and vertical alignments')
               )
             )
           ),
@@ -82,4 +85,3 @@
   </script>
 </body>
 </html>
-

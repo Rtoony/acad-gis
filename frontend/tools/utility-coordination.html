@@ -35,19 +35,21 @@
       useEffect(() => { load(); }, []);
 
       const columns = [
-        { key: 'utility_id', label: 'ID' },
         { key: 'company', label: 'Company' },
+        { key: 'project_name', label: 'Project' },
         { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Status' }
+        { key: 'status', label: 'Status' },
+        { key: 'request_date', label: 'Requested', format: 'date' },
+        { key: 'response_date', label: 'Response', format: 'date' }
       ];
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
           React.createElement('header', { className: 'header' },
             React.createElement('div', { className: 'header-content' },
-              React.createElement('div', { className: 'header-title' },
+                React.createElement('div', { className: 'header-title' },
                 React.createElement('h1', null, 'Utility Coordination'),
-                React.createElement('div', { className: 'header-subtitle' }, 'Requests, responses, conflicts (stub)')
+                React.createElement('div', { className: 'header-subtitle' }, 'Track requests, responses, and conflicts')
               )
             )
           ),
@@ -83,4 +85,3 @@
   </script>
 </body>
 </html>
-

@@ -53,20 +53,24 @@ Goal: Make the georeferenced DB and DXF pipeline the center of gravity.
 - Drawing Browser: fast search/filter; link to map extents
 - Importer: hook to pipeline jobs and status
 
-## Phase CM - CivilMicroTools Integration (New)
+## Phase CT - Civil Tools Integration (New)
 Goal: Integrate CivilOS-style, data-first civil tools on top of the Phase 3 database and API.
 
-CM‑1: Data + CRUD
+CT-1: Data + CRUD
 - Add tables for pipe networks, structures, pipes, alignments (horizontal/vertical), BMPs (with inspections/maintenance), utilities, conflicts, and optional jobs/artifacts.
 - CRUD + GeoJSON endpoints for each entity; server-side validations (pipe slopes, BMP compliance).
 - Tool pages: Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Sheet Note Manager, Plot & Profile Manager (basic forms + tables).
 
-CM‑2: Spatial + Exports
+CT-2: Spatial + Exports
 - Map integration for networks/alignments/BMPs via GeoJSON with bbox/srid.
 - Exports: DXF/LandXML/SVG/JSON/CSV for selected scopes (alignment/profile, network, BMPs).
 - Clash detection (pipes vs utilities) and validation summaries; persist artifacts.
 
-CM‑3: Intelligence
+CT-3: Intelligence
 - Velocity/diameter sizing helpers; alignment station equations and vertical curve checks.
 - Batch jobs + dashboards (compliance, conflicts, QA).
 - Constraint solver and revision intelligence prototypes.
+
+
+
+

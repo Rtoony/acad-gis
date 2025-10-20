@@ -27,9 +27,10 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 
 ## Import/Export
 - `POST /api/import/dxf` - upload DXF (stub)
-- Planned: Export endpoints for GeoJSON/GPKG and tiles
+- `POST /api/export/{format}` - DXF/LandXML/SVG/JSON (format string)
+- Planned: Export endpoints for GeoJSON/GPKG tiles
 
-## CivilMicroTools (New)
+## Civil Tools (New)
 
 ### Pipe Networks
 - `GET /api/pipe-networks` | `POST /api/pipe-networks`
@@ -51,11 +52,12 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 ### Utilities & Conflicts
 - `GET /api/utilities` | `POST /api/utilities` | `GET/PUT/DELETE /api/utilities/{id}`
 - `GET /api/conflicts` | `POST /api/conflicts` | `PUT /api/conflicts/{id}`
+- `GET /api/sheet-notes` - list sheet notes (optional `project_id`)
 
 ### Validation & Analytics
 - `POST /api/validate/pipe-slope` (by project/network)
-- `POST /api/validate/velocity`
-- `POST /api/clash-detection` (e.g., pipes vs utilities; tolerance optional)
+- `POST /api/validate/velocity` (placeholder)
+- `POST /api/clash-detection` (placeholder)
 
 ### Exports
 - `POST /api/export/dxf`
@@ -65,4 +67,5 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 
 ## Notes
 - BBOX parameters should be in `minx,miny,maxx,maxy` with SRID specified; server may simplify geometry by scale.
+
 
