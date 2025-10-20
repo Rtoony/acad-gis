@@ -63,6 +63,50 @@ class DrawingUpdate(BaseModel):
     description: Optional[str] = None
 
 # ============================================
+# CIVILMICROTOOLS MODELS (stubs)
+# ============================================
+
+class PipeNetworkCreate(BaseModel):
+    project_id: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class StructureCreate(BaseModel):
+    network_id: Optional[str] = None
+    type: Optional[str] = None
+    rim_elev: Optional[float] = None
+    sump_depth: Optional[float] = None
+
+class PipeCreate(BaseModel):
+    network_id: Optional[str] = None
+    up_structure_id: Optional[str] = None
+    down_structure_id: Optional[str] = None
+    diameter_mm: Optional[float] = None
+    material: Optional[str] = None
+    slope: Optional[float] = None
+
+class AlignmentCreate(BaseModel):
+    project_id: Optional[str] = None
+    name: Optional[str] = None
+    design_speed: Optional[float] = None
+
+class BMPCreate(BaseModel):
+    project_id: Optional[str] = None
+    type: Optional[str] = None
+    area_acres: Optional[float] = None
+    drainage_area_acres: Optional[float] = None
+
+class UtilityCreate(BaseModel):
+    project_id: Optional[str] = None
+    company: Optional[str] = None
+    type: Optional[str] = None
+
+class ConflictCreate(BaseModel):
+    project_id: Optional[str] = None
+    utility_id: Optional[str] = None
+    description: Optional[str] = None
+
+# ============================================
 # HEALTH CHECK
 # ============================================
 
@@ -656,6 +700,221 @@ def export_drawing(drawing_id: str, format: str = "dxf"):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export drawing: {str(e)}")
+
+@app.post("/api/export/{format}")
+def export_generic(format: str, payload: Dict[str, Any] = None):
+    return {
+        "success": True,
+        "message": f"Export stub: {format}",
+        "request": payload or {}
+    }
+
+# ============================================
+# CIVILMICROTOOLS STUB ENDPOINTS
+# ============================================
+
+# Pipe Networks
+@app.get("/api/pipe-networks")
+def list_pipe_networks():
+    return []
+
+@app.post("/api/pipe-networks")
+def create_pipe_network(payload: PipeNetworkCreate):
+    return {"network_id": "stub", "message": "Pipe network creation stub"}
+
+@app.get("/api/pipe-networks/{network_id}")
+def get_pipe_network(network_id: str):
+    return {"network_id": network_id, "message": "Pipe network get stub"}
+
+@app.put("/api/pipe-networks/{network_id}")
+def update_pipe_network(network_id: str, payload: PipeNetworkCreate):
+    return {"network_id": network_id, "message": "Pipe network update stub"}
+
+@app.delete("/api/pipe-networks/{network_id}")
+def delete_pipe_network(network_id: str):
+    return {"network_id": network_id, "message": "Pipe network delete stub"}
+
+# Pipes
+@app.get("/api/pipes")
+def list_pipes():
+    return []
+
+@app.post("/api/pipes")
+def create_pipe(payload: PipeCreate):
+    return {"pipe_id": "stub", "message": "Pipe creation stub"}
+
+@app.get("/api/pipes/{pipe_id}")
+def get_pipe(pipe_id: str):
+    return {"pipe_id": pipe_id, "message": "Pipe get stub"}
+
+@app.put("/api/pipes/{pipe_id}")
+def update_pipe(pipe_id: str, payload: PipeCreate):
+    return {"pipe_id": pipe_id, "message": "Pipe update stub"}
+
+@app.delete("/api/pipes/{pipe_id}")
+def delete_pipe(pipe_id: str):
+    return {"pipe_id": pipe_id, "message": "Pipe delete stub"}
+
+# Structures
+@app.get("/api/structures")
+def list_structures():
+    return []
+
+@app.post("/api/structures")
+def create_structure(payload: StructureCreate):
+    return {"structure_id": "stub", "message": "Structure creation stub"}
+
+@app.get("/api/structures/{structure_id}")
+def get_structure(structure_id: str):
+    return {"structure_id": structure_id, "message": "Structure get stub"}
+
+@app.put("/api/structures/{structure_id}")
+def update_structure(structure_id: str, payload: StructureCreate):
+    return {"structure_id": structure_id, "message": "Structure update stub"}
+
+@app.delete("/api/structures/{structure_id}")
+def delete_structure(structure_id: str):
+    return {"structure_id": structure_id, "message": "Structure delete stub"}
+
+# Alignments
+@app.get("/api/alignments")
+def list_alignments():
+    return []
+
+@app.post("/api/alignments")
+def create_alignment(payload: AlignmentCreate):
+    return {"alignment_id": "stub", "message": "Alignment creation stub"}
+
+@app.get("/api/alignments/{alignment_id}")
+def get_alignment(alignment_id: str):
+    return {"alignment_id": alignment_id, "message": "Alignment get stub"}
+
+@app.put("/api/alignments/{alignment_id}")
+def update_alignment(alignment_id: str, payload: AlignmentCreate):
+    return {"alignment_id": alignment_id, "message": "Alignment update stub"}
+
+@app.delete("/api/alignments/{alignment_id}")
+def delete_alignment(alignment_id: str):
+    return {"alignment_id": alignment_id, "message": "Alignment delete stub"}
+
+@app.get("/api/alignments/{alignment_id}/horizontal-elements")
+def list_horizontal_elements(alignment_id: str):
+    return []
+
+@app.post("/api/alignments/{alignment_id}/horizontal-elements")
+def create_horizontal_element(alignment_id: str, payload: Dict[str, Any]):
+    return {"element_id": "stub", "message": "Horizontal element creation stub"}
+
+@app.get("/api/alignments/{alignment_id}/vertical-elements")
+def list_vertical_elements(alignment_id: str):
+    return []
+
+@app.post("/api/alignments/{alignment_id}/vertical-elements")
+def create_vertical_element(alignment_id: str, payload: Dict[str, Any]):
+    return {"element_id": "stub", "message": "Vertical element creation stub"}
+
+# BMPs
+@app.get("/api/bmps")
+def list_bmps():
+    return []
+
+@app.post("/api/bmps")
+def create_bmp(payload: BMPCreate):
+    return {"bmp_id": "stub", "message": "BMP creation stub"}
+
+@app.get("/api/bmps/{bmp_id}")
+def get_bmp(bmp_id: str):
+    return {"bmp_id": bmp_id, "message": "BMP get stub"}
+
+@app.put("/api/bmps/{bmp_id}")
+def update_bmp(bmp_id: str, payload: BMPCreate):
+    return {"bmp_id": bmp_id, "message": "BMP update stub"}
+
+@app.delete("/api/bmps/{bmp_id}")
+def delete_bmp(bmp_id: str):
+    return {"bmp_id": bmp_id, "message": "BMP delete stub"}
+
+@app.get("/api/bmps/{bmp_id}/inspections")
+def list_bmp_inspections(bmp_id: str):
+    return []
+
+@app.post("/api/bmps/{bmp_id}/inspections")
+def create_bmp_inspection(bmp_id: str, payload: Dict[str, Any]):
+    return {"inspection_id": "stub", "message": "BMP inspection creation stub"}
+
+@app.get("/api/bmps/{bmp_id}/maintenance")
+def list_bmp_maintenance(bmp_id: str):
+    return []
+
+@app.post("/api/bmps/{bmp_id}/maintenance")
+def create_bmp_maintenance(bmp_id: str, payload: Dict[str, Any]):
+    return {"record_id": "stub", "message": "BMP maintenance creation stub"}
+
+# Utilities & Conflicts
+@app.get("/api/utilities")
+def list_utilities():
+    return []
+
+@app.post("/api/utilities")
+def create_utility(payload: UtilityCreate):
+    return {"utility_id": "stub", "message": "Utility creation stub"}
+
+@app.get("/api/utilities/{utility_id}")
+def get_utility(utility_id: str):
+    return {"utility_id": utility_id, "message": "Utility get stub"}
+
+@app.put("/api/utilities/{utility_id}")
+def update_utility(utility_id: str, payload: UtilityCreate):
+    return {"utility_id": utility_id, "message": "Utility update stub"}
+
+@app.delete("/api/utilities/{utility_id}")
+def delete_utility(utility_id: str):
+    return {"utility_id": utility_id, "message": "Utility delete stub"}
+
+@app.get("/api/conflicts")
+def list_conflicts():
+    return []
+
+@app.post("/api/conflicts")
+def create_conflict(payload: ConflictCreate):
+    return {"conflict_id": "stub", "message": "Conflict creation stub"}
+
+@app.put("/api/conflicts/{conflict_id}")
+def update_conflict(conflict_id: str, payload: Dict[str, Any]):
+    return {"conflict_id": conflict_id, "message": "Conflict update stub"}
+
+# GeoJSON endpoints (empty feature collections)
+def _empty_fc():
+    return {"type": "FeatureCollection", "features": []}
+
+@app.get("/api/pipes/geojson")
+def pipes_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, limit: Optional[int] = None):
+    return _empty_fc()
+
+@app.get("/api/structures/geojson")
+def structures_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, limit: Optional[int] = None):
+    return _empty_fc()
+
+@app.get("/api/alignments/{alignment_id}/geojson")
+def alignment_geojson(alignment_id: str):
+    return _empty_fc()
+
+@app.get("/api/bmps/geojson")
+def bmps_geojson(bbox: Optional[str] = None, srid: Optional[int] = None, type: Optional[str] = None):
+    return _empty_fc()
+
+# Validation stubs
+@app.post("/api/validate/pipe-slope")
+def validate_pipe_slope(scope: Dict[str, Any]):
+    return {"success": True, "message": "Validation stub: pipe slope", "results": []}
+
+@app.post("/api/validate/velocity")
+def validate_velocity(scope: Dict[str, Any]):
+    return {"success": True, "message": "Validation stub: velocity", "results": []}
+
+@app.post("/api/clash-detection")
+def clash_detection(scope: Dict[str, Any]):
+    return {"success": True, "message": "Clash detection stub", "conflicts": []}
 
 # ============================================
 # RUN SERVER

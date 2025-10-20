@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipe Network Editor | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Pipe Network Editor'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+
+    function PipeNetworkEditor() {
+      const [networks, setNetworks] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+
+      const load = async () => {
+        setLoading(true); setError('');
+        try { const data = await API.list('/pipe-networks'); setNetworks(data || []); }
+        catch (e) { setError(e.message || 'Failed to load pipe networks'); }
+        finally { setLoading(false); }
+      };
+
+      useEffect(() => { load(); }, []);
+
+      const columns = [
+        { key: 'network_id', label: 'ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'description', label: 'Description' }
+      ];
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(HeaderComp, { title: 'Pipe Network Editor', subtitle: 'Manage pipe networks (stub)' }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Networks'),
+                  React.createElement('div', null,
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: load },
+                      React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh')
+                  )
+                ),
+                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
+                loading
+                  ? React.createElement('div', { className: 'text-center p-lg' }, 'Loading...')
+                  : React.createElement(window.DataTable || (({ data }) => React.createElement('pre', null, JSON.stringify(data, null, 2))), {
+                      data: networks,
+                      columns,
+                      searchable: true,
+                      pagination: true,
+                      pageSize: 20,
+                      emptyMessage: 'No networks found'
+                    })
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(PipeNetworkEditor));
+  </script>
+</body>
+</html>
+

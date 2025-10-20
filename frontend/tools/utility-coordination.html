@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Utility Coordination | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+
+    function UtilityCoordination() {
+      const [utilities, setUtilities] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+
+      const load = async () => {
+        setLoading(true); setError('');
+        try { const data = await API.list('/utilities'); setUtilities(data || []); }
+        catch (e) { setError(e.message || 'Failed to load utilities'); }
+        finally { setLoading(false); }
+      };
+
+      useEffect(() => { load(); }, []);
+
+      const columns = [
+        { key: 'utility_id', label: 'ID' },
+        { key: 'company', label: 'Company' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Status' }
+      ];
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement('header', { className: 'header' },
+            React.createElement('div', { className: 'header-content' },
+              React.createElement('div', { className: 'header-title' },
+                React.createElement('h1', null, 'Utility Coordination'),
+                React.createElement('div', { className: 'header-subtitle' }, 'Requests, responses, conflicts (stub)')
+              )
+            )
+          ),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Utilities'),
+                  React.createElement('div', null,
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: load },
+                      React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh')
+                  )
+                ),
+                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
+                loading
+                  ? React.createElement('div', { className: 'text-center p-lg' }, 'Loading...')
+                  : React.createElement(window.DataTable || (({ data }) => React.createElement('pre', null, JSON.stringify(data, null, 2))), {
+                      data: utilities,
+                      columns,
+                      searchable: true,
+                      pagination: true,
+                      pageSize: 20,
+                      emptyMessage: 'No utilities found'
+                    })
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(UtilityCoordination));
+  </script>
+</body>
+</html>
+

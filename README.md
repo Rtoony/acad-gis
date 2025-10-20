@@ -48,6 +48,9 @@ acad-gis/
 3) Configure API base
 - Frontend expects `http://localhost:8000/api` by default. Update in `frontend/shared/components.js` if needed.
 
+## New to This Project?
+- Start with the beginner-friendly overview: `docs/BEGINNERS_GUIDE.md`
+
 ## Tools
 - Project Manager: `frontend/tools/project-manager.html:1`
 - Drawing Browser: `frontend/tools/drawing_browser.html:1`
@@ -64,4 +67,3 @@ acad-gis/
 
 ## Philosophy
 CAD projects are information, not vendor-bound files. Python + PostGIS + open formats can handle the majority of civil/survey workflows without proprietary software.
-

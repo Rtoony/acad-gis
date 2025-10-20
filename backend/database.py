@@ -406,6 +406,31 @@ def vector_search(
     
     return execute_query(query, (query_embedding, query_embedding, limit))
 
+# ============================================
+# CIVILMICROTOOLS STUB HELPERS
+# ============================================
+
+def list_pipe_networks() -> List[Dict]:
+    return []
+
+def list_pipes() -> List[Dict]:
+    return []
+
+def list_structures() -> List[Dict]:
+    return []
+
+def list_alignments() -> List[Dict]:
+    return []
+
+def list_bmps() -> List[Dict]:
+    return []
+
+def list_utilities() -> List[Dict]:
+    return []
+
+def list_conflicts() -> List[Dict]:
+    return []
+
 if __name__ == "__main__":
     # Test connection
     print("Testing database connection...")
