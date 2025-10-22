@@ -216,7 +216,7 @@
 2. **Start your API server:**
    ```bash
    cd backend
-   python api_server_ENHANCED.py
+   python api_server.py
    ```
 
 3. **Open Tool Launcher:**

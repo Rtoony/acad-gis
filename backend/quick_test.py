@@ -98,7 +98,7 @@ try:
     print()
     print("Next steps:")
     print("  1. Start your API server:")
-    print("     python api_server_ENHANCED.py")
+    print("     python api_server.py")
     print()
     print("  2. Refresh your browser:")
     print("     file:///H:/acad-gis/tool_launcher.html")

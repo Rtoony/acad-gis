@@ -28,7 +28,7 @@
   <script src="../shared/react-components.js"></script>
   <script src="../shared/api.js"></script>
   <script type="text/babel">
-    const { useEffect, useRef, useState } = React;
+    const { useEffect, useRef, useState, useMemo, useCallback } = React;
     const HeaderComp = window.Header || (({ title, subtitle }) => (
       React.createElement('header', { className: 'header' },
         React.createElement('div', { className: 'header-content' },
@@ -40,6 +40,14 @@
       )
     ));
 
+    const FEATURE_STYLE = {
+      line: { color: '#22d3ee', weight: 2 },
+      polygon: { color: '#a855f7', weight: 1.2, fillColor: '#a855f7', fillOpacity: 0.18 },
+      symbol: { color: '#2563eb', radius: 6 },
+      point: { color: '#10b981', radius: 4 },
+      label: { color: '#f97316', radius: 5 }
+    };
+
     function MapViewer() {
       const mapRef = useRef(null);
       const mapEl = useRef(null);
@@ -50,8 +58,11 @@
       const [drawingId, setDrawingId] = useState('');
       const [mousePos, setMousePos] = useState({ lat: 0, lng: 0 });
       const [zoom, setZoom] = useState(12);
+      const [featureSummary, setFeatureSummary] = useState({ count: 0, source: null });
+      const [loadingGeojson, setLoadingGeojson] = useState(false);
       const apiClient = window.API || { list: async () => [], request: async () => ({}) };
       const locate = useRef({ marker: null, circle: null });
+      const featureLayer = useRef(null);
 
       useEffect(() => {
         if (mapRef.current) return; // already init
@@ -77,9 +88,6 @@
         L.control.scale().addTo(map);
         L.control.layers({ 'OSM': osm, 'Esri Imagery': esri, 'CARTO Voyager': carto }, {}, { position: 'topright' }).addTo(map);
 
-        // Example: draw a demo marker
-        L.marker([38.4405, -122.7144]).addTo(map).bindPopup('Map Viewer Ready');
-
         mapRef.current = map;
         map.on('mousemove', (e) => setMousePos({ lat: e.latlng.lat, lng: e.latlng.lng }));
         map.on('zoomend', () => setZoom(map.getZoom()));
@@ -103,26 +111,85 @@
         })();
       }, [projectId]);
 
-      // Zoom to drawing extent
+      // Load extent + GeoJSON overlay when drawing changes
       useEffect(() => {
-        if (!drawingId || !mapRef.current) return;
+        const map = mapRef.current;
+        if (!map) return;
+
+        let cancelled = false;
+        const clearLayer = () => {
+          if (featureLayer.current) {
+            map.removeLayer(featureLayer.current);
+            featureLayer.current = null;
+          }
+        };
+
+        if (!drawingId) {
+          clearLayer();
+          setFeatureSummary({ count: 0, source: null });
+          setLoadingGeojson(false);
+          return;
+        }
+
+        setLoadingGeojson(true);
+        setFeatureSummary({ count: 0, source: null });
+
         (async () => {
           try {
-            const data = await apiClient.request('GET', `/drawings/${drawingId}/extent`);
-            if (data && data.bounds) {
-              const epsg = data.drawing_epsg_code || 'EPSG:4326';
-              const b = data.bounds;
+            const extent = await apiClient.request('GET', `/drawings/${drawingId}/extent?srid=4326`);
+            if (!cancelled && extent && extent.bounds) {
+              const epsg = extent.stats?.source === 'block_inserts'
+                ? (extent.drawing_epsg_code || 'EPSG:4326')
+                : 'EPSG:4326';
+              const b = extent.bounds;
               const ll = transformToLatLng([b.min_x, b.min_y], epsg);
               const ur = transformToLatLng([b.max_x, b.max_y], epsg);
               const sw = L.latLng(ll.lat, ll.lng);
               const ne = L.latLng(ur.lat, ur.lng);
-              mapRef.current.fitBounds(L.latLngBounds(sw, ne), { padding: [30, 30] });
+              if (sw && ne && sw.lat !== ne.lat && sw.lng !== ne.lng) {
+                map.fitBounds(L.latLngBounds(sw, ne), { padding: [30, 30] });
+              }
             }
-          } catch (e) {
-            console.warn('Failed to get drawing bounds', e);
+          } catch (err) {
+            console.warn('Failed to get drawing bounds', err);
+          }
+
+          try {
+            const geo = await apiClient.request('GET', `/drawings/${drawingId}/geojson?limit=5000`);
+            if (cancelled) return;
+
+            clearLayer();
+            if (geo && geo.features && geo.features.length) {
+              featureLayer.current = L.geoJSON(geo, {
+                style: geoJsonStyle,
+                pointToLayer: geoJsonPoint,
+                onEachFeature: geoJsonOnEach
+              }).addTo(map);
+
+              const layerBounds = featureLayer.current.getBounds();
+              if (layerBounds && layerBounds.isValid()) {
+                map.fitBounds(layerBounds.pad(0.05), { padding: [20, 20] });
+              }
+            }
+
+            setFeatureSummary({
+              count: geo?.count || (geo?.features ? geo.features.length : 0),
+              source: geo?.source || 'canonical_features',
+              srid: geo?.srid || 4326
+            });
+          } catch (err) {
+            if (!cancelled) {
+              console.warn('Failed to load drawing GeoJSON', err);
+              setFeatureSummary({ count: 0, source: null, error: err?.message || 'GeoJSON load failed' });
+              clearLayer();
+            }
+          } finally {
+            if (!cancelled) setLoadingGeojson(false);
           }
         })();
-      }, [drawingId]);
+
+        return () => { cancelled = true; };
+      }, [drawingId, apiClient, geoJsonOnEach, geoJsonPoint, geoJsonStyle]);
 
       function transformToLatLng([x, y], fromEpsg) {
         try {
@@ -142,6 +209,39 @@
           }
         }
       }
+
+      const geoJsonStyle = useCallback((feature) => {
+        const type = feature?.properties?.feature_type || 'line';
+        const style = FEATURE_STYLE[type] || FEATURE_STYLE.line;
+        return {
+          color: style.color,
+          weight: style.weight || 2,
+          fillColor: style.fillColor || style.color,
+          fillOpacity: style.fillOpacity ?? 0.1
+        };
+      }, []);
+
+      const geoJsonPoint = useCallback((feature, latlng) => {
+        const type = feature?.properties?.feature_type || 'point';
+        const style = FEATURE_STYLE[type] || FEATURE_STYLE.point;
+        return L.circleMarker(latlng, {
+          radius: style.radius || 4,
+          color: style.color,
+          fillColor: style.fillColor || style.color,
+          fillOpacity: style.fillOpacity ?? 0.85,
+          weight: 1
+        });
+      }, []);
+
+      const geoJsonOnEach = useCallback((feature, layer) => {
+        const props = feature?.properties || {};
+        const lines = [];
+        if (props.layer_name) lines.push(`<strong>${props.layer_name}</strong>`);
+        if (props.feature_type) lines.push(`Type: ${props.feature_type}`);
+        if (props.metadata?.block_name) lines.push(`Block: ${props.metadata.block_name}`);
+        if (props.metadata?.text) lines.push(props.metadata.text);
+        if (lines.length) layer.bindPopup(lines.join('<br/>'));
+      }, []);
 
       function doLocate() {
         const map = mapRef.current; if (!map) return;
@@ -186,7 +286,14 @@
                 React.createElement('div', { className: 'card-footer' },
                   React.createElement('div', { className: 'statusbar' },
                     React.createElement('div', null, `Lat: ${mousePos.lat.toFixed(6)}  Lng: ${mousePos.lng.toFixed(6)}`),
-                    React.createElement('div', null, `Zoom: ${zoom}`)
+                    React.createElement('div', null, `Zoom: ${zoom}`),
+                    React.createElement('div', null,
+                      loadingGeojson
+                        ? 'Features: loading…'
+                        : featureSummary.error
+                          ? `Features: ${featureSummary.error}`
+                          : `Features: ${featureSummary.count} (${featureSummary.source || '—'}, EPSG:${featureSummary.srid || '4326'})`
+                    )
                   )
                 )
               )

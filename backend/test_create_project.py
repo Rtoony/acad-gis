@@ -1,4 +1,11 @@
-from database import create_project, get_project
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.append(str(Path(__file__).resolve().parent))
+    from database import create_project, get_project  # type: ignore
+else:
+    from .database import create_project, get_project  # type: ignore
 import uuid
 
 print("Creating test project...")

@@ -63,7 +63,7 @@ pip install -r requirements.txt
 
 ```bash
 cd backend
-python api_server_ENHANCED.py
+python api_server.py
 ```
 
 The API will start on `http://localhost:8000`
@@ -81,7 +81,7 @@ ACAD_GIS/
 ├── tool_launcher.html              # 🏠 START HERE - Central navigation hub
 │
 ├── backend/
-│   ├── api_server_ENHANCED.py      # FastAPI REST server
+│   ├── api_server.py      # FastAPI REST server
 │   ├── database.py                 # Database connection & queries
 │   ├── import_dxf_georef.py        # DXF processing script
 │   └── .env                        # Database configuration (you create this)
@@ -261,7 +261,7 @@ DB_PASSWORD=your_secure_password
 
 ### API Server
 Default port: `8000`  
-To change: Edit `api_server_ENHANCED.py` (last line)
+To change: Edit `api_server.py` (last line)
 
 ### Frontend Tools
 API URL is configured in `shared/components.js`:
@@ -380,7 +380,7 @@ Create a `.bat` file to launch everything:
 @echo off
 start "" "http://localhost/ACAD_GIS/tool_launcher.html"
 cd C:\path\to\ACAD_GIS\backend
-start python api_server_ENHANCED.py
+start python api_server.py
 ```
 
 ### Browser Setup

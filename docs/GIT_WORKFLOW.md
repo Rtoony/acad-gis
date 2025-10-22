@@ -65,7 +65,7 @@ On branch main
 Your branch is up to date with 'origin/main'.
 
 Changes not staged for commit:
-  modified:   backend/api_server_ENHANCED.py
+  modified:   backend/api_server.py
   modified:   docs/PROJECT_CONTEXT.md
 
 Untracked files:
@@ -78,7 +78,7 @@ Untracked files:
 git diff
 
 # See diff for specific file
-git diff backend/api_server_ENHANCED.py
+git diff backend/api_server.py
 ```
 
 ### Saving Work (Committing)
@@ -91,7 +91,7 @@ git diff backend/api_server_ENHANCED.py
 git add .
 
 # OR stage specific files
-git add backend/api_server_ENHANCED.py
+git add backend/api_server.py
 git add frontend/tools/project_manager.html
 ```
 
@@ -206,7 +206,7 @@ git diff 196a688 4ef8d94
 **Scenario 1: Undo changes to file (not yet staged)**
 ```bash
 # Restore file to last committed version
-git restore backend/api_server_ENHANCED.py
+git restore backend/api_server.py
 
 # Restore all changed files
 git restore .
@@ -215,7 +215,7 @@ git restore .
 **Scenario 2: Unstage file (staged but not committed)**
 ```bash
 # Remove from staging area, keep changes
-git restore --staged backend/api_server_ENHANCED.py
+git restore --staged backend/api_server.py
 ```
 
 **Scenario 3: Undo last commit (keep changes)**
@@ -379,7 +379,7 @@ git push
 
 **Git will flag conflicts:**
 ```
-CONFLICT (content): Merge conflict in backend/api_server_ENHANCED.py
+CONFLICT (content): Merge conflict in backend/api_server.py
 ```
 
 **Resolve manually:**
@@ -398,7 +398,7 @@ their version
 
 **Then commit:**
 ```bash
-git add backend/api_server_ENHANCED.py
+git add backend/api_server.py
 git commit -m "fix: Resolve merge conflict"
 git push
 ```
@@ -497,15 +497,15 @@ git stash pop
 ### Viewing File History
 ```bash
 # See all commits that changed a file
-git log -- backend/api_server_ENHANCED.py
+git log -- backend/api_server.py
 
 # See what changed in each commit
-git log -p -- backend/api_server_ENHANCED.py
+git log -p -- backend/api_server.py
 ```
 
 ### Blaming (Who Changed This Line?)
 ```bash
-git blame backend/api_server_ENHANCED.py
+git blame backend/api_server.py
 
 # Shows who wrote each line and when
 ```

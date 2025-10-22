@@ -8,14 +8,40 @@ Usage:
 """
 
 import argparse
-import ezdxf
+import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from database import (
-    create_drawing, create_layer, create_block_insert,
-    create_block_definition, get_project, get_block_definition,
-    execute_query
-)
+from typing import Any, Dict, List, Optional, Tuple
+
+import ezdxf
+from pyproj import Transformer
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.append(str(Path(__file__).resolve().parent))
+    from database import (  # type: ignore
+        create_drawing,
+        create_layer,
+        create_block_insert,
+        create_block_definition,
+        get_project,
+        get_block_definition,
+        execute_query,
+        clear_canonical_features,
+        insert_canonical_feature,
+    )
+else:
+    from .database import (  # type: ignore
+        create_drawing,
+        create_layer,
+        create_block_insert,
+        create_block_definition,
+        get_project,
+        get_block_definition,
+        execute_query,
+        clear_canonical_features,
+        insert_canonical_feature,
+    )
 
 class GeoreferencedDXFImporter:
     """Import DXF files with automatic georeferencing detection."""
@@ -30,7 +56,14 @@ class GeoreferencedDXFImporter:
     EPSG_2226_Y_MIN = 1900000
     EPSG_2226_Y_MAX = 2300000
     
-    def __init__(self, dxf_path: str, project_id: str, force_georef: bool = False):
+    def __init__(
+        self,
+        dxf_path: str,
+        project_id: str,
+        force_georef: bool = False,
+        override_epsg: Optional[int] = None,
+        override_coordinate_system: Optional[str] = None
+    ):
         self.dxf_path = Path(dxf_path)
         self.project_id = project_id
         self.force_georef = force_georef
@@ -39,11 +72,15 @@ class GeoreferencedDXFImporter:
         self.is_georeferenced = False
         self.epsg_code = None
         self.coordinate_system = None
+        self.override_epsg = override_epsg
+        self.override_coordinate_system = override_coordinate_system
+        self.transformer: Optional[Transformer] = None
         self.stats = {
             'layers': 0,
             'blocks': 0,
             'inserts': 0,
-            'entities': 0
+            'entities': 0,
+            'canonical_features': 0
         }
     
     def load_dxf(self):
@@ -110,6 +147,12 @@ class GeoreferencedDXFImporter:
         print(f"  📊 Coordinate ranges:")
         print(f"     X: {min_x:,.2f} to {max_x:,.2f}")
         print(f"     Y: {min_y:,.2f} to {max_y:,.2f}")
+
+        if self.override_epsg:
+            epsg = int(self.override_epsg)
+            label = self.override_coordinate_system or f"EPSG:{epsg}"
+            print(f"  📌 Using override EPSG: {epsg} ({label})")
+            return True, epsg, label
         
         # Check if coordinates fall within CA State Plane Zone 2 range
         is_in_epsg_2226 = (
@@ -134,6 +177,17 @@ class GeoreferencedDXFImporter:
         
         # Detect georeferencing
         self.is_georeferenced, self.epsg_code, self.coordinate_system = self.detect_georeferencing()
+
+        if self.override_epsg:
+            self.is_georeferenced = True
+            self.epsg_code = int(self.override_epsg)
+            if not self.coordinate_system:
+                self.coordinate_system = (
+                    self.override_coordinate_system or f"EPSG:{self.epsg_code}"
+                )
+
+        if self.is_georeferenced and self.epsg_code:
+            self._ensure_transformer()
         
         # Read raw DXF content
         with open(self.dxf_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -177,7 +231,7 @@ class GeoreferencedDXFImporter:
             dxf_content,
             f"Imported from {self.dxf_path.name}",
             None,  # tags
-            str(metadata).replace("'", '"'),  # metadata as json string
+            json.dumps(metadata),
             self.is_georeferenced,
             self.epsg_code,
             self.coordinate_system,
@@ -201,6 +255,223 @@ class GeoreferencedDXFImporter:
     def extract_drawing_number(self) -> str:
         """Try to extract drawing number from title block."""
         return None
+
+    def _ensure_transformer(self):
+        """Prepare a CRS transformer when georeferencing is available."""
+        if not self.is_georeferenced or not self.epsg_code:
+            self.transformer = None
+            return
+
+        if self.transformer is not None:
+            return
+
+        try:
+            self.transformer = Transformer.from_crs(
+                f"EPSG:{self.epsg_code}",
+                "EPSG:4326",
+                always_xy=True
+            )
+        except Exception as exc:
+            print(f"  ⚠️  Failed to initialise transformer: {exc}")
+            self.transformer = None
+
+    @staticmethod
+    def _format_number(value: float) -> str:
+        """Format coordinates with sensible precision."""
+        return f"{value:.8f}".rstrip('0').rstrip('.') if abs(value) < 1e6 else f"{value:.3f}"
+
+    def _point_wkt(self, coord: Tuple[float, float]) -> Optional[str]:
+        if not coord:
+            return None
+        x, y = coord
+        return f"POINT ({self._format_number(x)} {self._format_number(y)})"
+
+    def _linestring_wkt(self, coords: List[Tuple[float, float]]) -> Optional[str]:
+        if not coords or len(coords) < 2:
+            return None
+        pairs = ", ".join(
+            f"{self._format_number(x)} {self._format_number(y)}" for x, y in coords
+        )
+        return f"LINESTRING ({pairs})"
+
+    def _polygon_wkt(self, coords: List[Tuple[float, float]]) -> Optional[str]:
+        if not coords or len(coords) < 4:
+            return None
+        if coords[0] != coords[-1]:
+            coords = coords + [coords[0]]
+        pairs = ", ".join(
+            f"{self._format_number(x)} {self._format_number(y)}" for x, y in coords
+        )
+        return f"POLYGON (({pairs}))"
+
+    def _transform_coords(
+        self,
+        coords: List[Tuple[float, float]]
+    ) -> Optional[List[Tuple[float, float]]]:
+        """Transform coordinates to EPSG:4326 if possible."""
+        if not coords or not self.transformer:
+            return None
+        transformed: List[Tuple[float, float]] = []
+        for x, y in coords:
+            try:
+                lon, lat = self.transformer.transform(x, y)
+                transformed.append((lon, lat))
+            except Exception:
+                return None
+        return transformed
+
+    def _extract_canonical_feature(
+        self,
+        entity
+    ) -> Optional[Tuple[str, Optional[str], Optional[str], Optional[str], Dict[str, Any]]]:
+        """Convert a DXF entity into native/canonical WKTs."""
+        entity_type = entity.dxftype()
+        layer_name = getattr(entity.dxf, "layer", None)
+        handle = getattr(entity.dxf, "handle", None)
+
+        metadata: Dict[str, Any] = {
+            "source": "dxf_import",
+            "entity_type": entity_type,
+            "layer": layer_name,
+            "handle": handle
+        }
+
+        try:
+            if entity_type == "LINE":
+                start = entity.dxf.start
+                end = entity.dxf.end
+                coords = [(start.x, start.y), (end.x, end.y)]
+                native_wkt = self._linestring_wkt(coords)
+                canonical_coords = self._transform_coords(coords)
+                canonical_wkt = self._linestring_wkt(canonical_coords) if canonical_coords else None
+                return ("line", layer_name, native_wkt, canonical_wkt, metadata)
+
+            if entity_type == "LWPOLYLINE":
+                coords = [(x, y) for x, y, *_ in entity.get_points("xyseb")]
+                is_closed = bool(entity.closed)
+                metadata["closed"] = is_closed
+                if is_closed and len(coords) >= 3:
+                    if coords[0] != coords[-1]:
+                        coords.append(coords[0])
+                    native_wkt = self._polygon_wkt(coords)
+                    canonical_coords = self._transform_coords(coords)
+                    canonical_wkt = self._polygon_wkt(canonical_coords) if canonical_coords else None
+                    return ("polygon", layer_name, native_wkt, canonical_wkt, metadata)
+                native_wkt = self._linestring_wkt(coords)
+                canonical_coords = self._transform_coords(coords)
+                canonical_wkt = self._linestring_wkt(canonical_coords) if canonical_coords else None
+                return ("line", layer_name, native_wkt, canonical_wkt, metadata)
+
+            if entity_type == "POLYLINE":
+                coords = []
+                for vertex in entity.vertices():
+                    loc = vertex.dxf.location
+                    coords.append((loc.x, loc.y))
+                is_closed = bool(entity.is_closed)
+                metadata["closed"] = is_closed
+                if is_closed and len(coords) >= 3:
+                    if coords[0] != coords[-1]:
+                        coords.append(coords[0])
+                    native_wkt = self._polygon_wkt(coords)
+                    canonical_coords = self._transform_coords(coords)
+                    canonical_wkt = self._polygon_wkt(canonical_coords) if canonical_coords else None
+                    return ("polygon", layer_name, native_wkt, canonical_wkt, metadata)
+                native_wkt = self._linestring_wkt(coords)
+                canonical_coords = self._transform_coords(coords)
+                canonical_wkt = self._linestring_wkt(canonical_coords) if canonical_coords else None
+                return ("line", layer_name, native_wkt, canonical_wkt, metadata)
+
+            if entity_type == "POINT":
+                location = entity.dxf.location
+                coord = (location.x, location.y)
+                native_wkt = self._point_wkt(coord)
+                canonical_coords = self._transform_coords([coord])
+                canonical_wkt = None
+                if canonical_coords:
+                    canonical_wkt = self._point_wkt(canonical_coords[0])
+                return ("point", layer_name, native_wkt, canonical_wkt, metadata)
+
+            if entity_type == "INSERT":
+                insert = entity.dxf.insert
+                coord = (insert.x, insert.y)
+                metadata["block_name"] = entity.dxf.name
+                metadata["has_attributes"] = bool(getattr(entity, "attribs", []))
+                native_wkt = self._point_wkt(coord)
+                canonical_coords = self._transform_coords([coord])
+                canonical_wkt = None
+                if canonical_coords:
+                    canonical_wkt = self._point_wkt(canonical_coords[0])
+                return ("symbol", layer_name, native_wkt, canonical_wkt, metadata)
+
+            if entity_type in {"TEXT", "MTEXT"}:
+                insert = getattr(entity.dxf, "insert", None)
+                if insert is None:
+                    return None
+                coord = (insert.x, insert.y)
+                text_value = getattr(entity.dxf, "text", None) or getattr(entity, "text", None)
+                metadata["text"] = text_value
+                native_wkt = self._point_wkt(coord)
+                canonical_coords = self._transform_coords([coord])
+                canonical_wkt = None
+                if canonical_coords:
+                    canonical_wkt = self._point_wkt(canonical_coords[0])
+                return ("label", layer_name, native_wkt, canonical_wkt, metadata)
+        except Exception as exc:
+            metadata["error"] = str(exc)
+            return None
+
+        return None
+
+    def import_canonical_geometry(self):
+        """Populate canonical_features from the DXF model space."""
+        print(f"\n🌐 Writing canonical geometries...")
+
+        try:
+            clear_canonical_features(self.drawing_id)
+        except Exception as exc:
+            print(f"  ✗ Failed to clear existing canonical features: {exc}")
+            return
+
+        # Refresh transformer in case overrides were applied
+        self._ensure_transformer()
+
+        msp = self.doc.modelspace()
+        inserted = 0
+        skipped = 0
+
+        for entity in msp:
+            feature = self._extract_canonical_feature(entity)
+            if not feature:
+                continue
+
+            feature_type, layer_name, native_wkt, canonical_wkt, metadata = feature
+            if not native_wkt and not canonical_wkt:
+                skipped += 1
+                continue
+
+            try:
+                insert_canonical_feature(
+                    drawing_id=self.drawing_id,
+                    project_id=self.project_id,
+                    feature_type=feature_type,
+                    layer_name=layer_name,
+                    native_wkt=native_wkt,
+                    native_srid=self.epsg_code if self.is_georeferenced else None,
+                    canonical_wkt=canonical_wkt,
+                    metadata=metadata
+                )
+                inserted += 1
+            except Exception as exc:
+                skipped += 1
+                print(f"  ✗ Failed to store canonical {feature_type}: {exc}")
+
+        self.stats['canonical_features'] = inserted
+        if inserted:
+            print(f"✅ Canonical features stored: {inserted}")
+        else:
+            print("ℹ️  No canonical geometries were generated.")
+        if skipped:
+            print(f"   ⚠️  Skipped {skipped} entities. See logs for details.")
     
     def import_layers(self):
         """Import all layers from DXF."""
@@ -373,6 +644,7 @@ class GeoreferencedDXFImporter:
         self.import_blocks()
         self.import_block_inserts()
         self.import_other_entities()
+        self.import_canonical_geometry()
         
         # Summary
         print("\n" + "="*60)
@@ -388,6 +660,7 @@ class GeoreferencedDXFImporter:
         print(f"Blocks:         {self.stats['blocks']}")
         print(f"Inserts:        {self.stats['inserts']}")
         print(f"Total Entities: {self.stats['entities']}")
+        print(f"Canonical Feat: {self.stats['canonical_features']}")
         print("="*60)
         print(f"\n✅ Import complete! Drawing stored in database.")
         

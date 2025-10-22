@@ -45,7 +45,7 @@ Project Name:    acad-gis
 ├── backend/                            # API server and database logic
 │   ├── .env                            # Environment variables (NOT in Git)
 │   ├── .env.example                    # Example env file (IS in Git)
-│   ├── api_server_ENHANCED.py          # FastAPI server
+│   ├── api_server.py          # FastAPI server
 │   ├── database.py                     # Database connection helpers
 │   ├── import_dxf_georef.py            # DXF import script
 │   └── requirements.txt                # Backend-specific dependencies (legacy)
@@ -202,7 +202,7 @@ source venv/bin/activate
 
 # Start server from backend directory
 cd backend
-uvicorn api_server_ENHANCED:app --reload --host 0.0.0.0 --port 5000
+uvicorn api_server:app --reload --host 0.0.0.0 --port 5000
 ```
 
 **Expected Output:**
@@ -359,7 +359,7 @@ git pull
 
 # 5. Start API server (Terminal Tab 1)
 cd backend
-uvicorn api_server_ENHANCED:app --reload --host 0.0.0.0 --port 5000
+uvicorn api_server:app --reload --host 0.0.0.0 --port 5000
 
 # 6. Open VS Code (Terminal Tab 2)
 cd ~/projects/acad-gis

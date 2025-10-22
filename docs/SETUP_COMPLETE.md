@@ -194,7 +194,7 @@ C:\Users\Josh\Desktop\ACAD_GIS\
 │       └── components.js
 │
 ├── backend\                    ← Your existing files
-│   ├── api_server_ENHANCED.py
+│   ├── api_server.py
 │   ├── database.py
 │   └── .env
 │
@@ -228,7 +228,7 @@ mkdir -p C:\Users\Josh\Desktop\ACAD_GIS\docs
 1. **Start your API server:**
    ```bash
    cd C:\Users\Josh\Desktop\ACAD_GIS\backend
-   python api_server_ENHANCED.py
+   python api_server.py
    ```
 
 2. **Open Tool Launcher:**

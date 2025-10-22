@@ -40,7 +40,7 @@ acad-gis/
 1) Start backend (example)
 - Ensure Postgres/PostGIS reachable (Supabase or local)
 - Run FastAPI (adjust to your env):
-  - `python -m uvicorn backend.api_server_ENHANCED:app --reload --port 8000`
+  - `python -m uvicorn backend.api_server:app --reload --port 8000`
 
 2) Open the UI (static HTML)
 - Open `tool_launcher.html` directly, or serve `frontend/` via a lightweight server.

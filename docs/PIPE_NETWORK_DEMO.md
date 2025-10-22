@@ -8,7 +8,7 @@ A quick reference for the seeded pipe-network data and tooling added during the 
 ## Prerequisites
 - FastAPI server running at http://localhost:8000
   `ash
-  uvicorn backend.api_server_ENHANCED:app --reload --port 8000
+  uvicorn backend.api_server:app --reload --port 8000
   `
 - Python virtualenv with the demo dependencies (Streamlit, pandas, pydeck)
   `ash
@@ -30,7 +30,8 @@ A quick reference for the seeded pipe-network data and tooling added during the 
 2. **Validation Endpoint**
    - POST /api/validate/pipe-slope with optional project_id or 
 etwork_id
-   - Response now includes summary, esults, and per-pipe slope_margin
+   - Response now includes summary, 
+esults, and per-pipe slope_margin
 
 3. **Streamlit Viewer** (interactive map + tables)
    `ash
@@ -66,3 +67,20 @@ Extras:
   `
 
 Happy demoing!
+
+## Seeding Instructions
+- Ensure database env vars are set (prefer `backend/.env`).
+- Run the seeding script from repo root:
+  `\bash
+  python tools/seed_pipe_demo.py
+  `
+- Verify via API:
+  - `GET /api/pipe-networks` returns networks with slope stats
+  - `GET /api/pipe-networks/{id}/detail` shows pipes, structures, conflicts, notes
+
+Idempotency: the script reuses projects/networks by name and refreshes only that network’s pipes/structures. Utilities, conflicts, and notes are upserted by simple keys.
+
+Structure Types
+- Some databases enforce allowed `structures.type` values via a CHECK or enum.
+- The seeder now auto-discovers allowed values from the DB (enum labels or parsed from CHECK) and maps MH/CB to the closest match.
+- If your schema uses different labels, adjust the synonym lists in `tools/seed_pipe_demo.py` and rerun.

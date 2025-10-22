@@ -10,10 +10,14 @@ import psycopg2
 from psycopg2.extras import RealDictCursor, Json
 from contextlib import contextmanager
 import uuid
+from pathlib import Path
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+env_path = Path(__file__).resolve().parent / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path, override=True)
 
 # Database configuration - loads from .env file
 DB_CONFIG = {
@@ -322,6 +326,132 @@ def get_all_layer_standards() -> List[Dict]:
     return execute_query(
         "SELECT * FROM layer_standards ORDER BY display_order, layer_name"
     )
+
+# ============================================
+# CANONICAL FEATURES
+# ============================================
+
+def clear_canonical_features(drawing_id: str):
+    """Remove canonical features for a drawing prior to re-import."""
+    query = "DELETE FROM canonical_features WHERE drawing_id = %s"
+    execute_query(query, (drawing_id,), fetch=False)
+
+
+def insert_canonical_feature(
+    drawing_id: str,
+    project_id: str,
+    feature_type: str,
+    layer_name: Optional[str],
+    native_wkt: Optional[str],
+    native_srid: Optional[int],
+    canonical_wkt: Optional[str],
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[str]:
+    """Persist a canonical feature record and return its feature_id."""
+    query = """
+        INSERT INTO canonical_features (
+            feature_id,
+            drawing_id,
+            project_id,
+            feature_type,
+            layer_name,
+            native_geom,
+            native_srid,
+            geom,
+            metadata
+        )
+        VALUES (
+            gen_random_uuid(),
+            %s,
+            %s,
+            %s,
+            %s,
+            CASE
+                WHEN %s IS NULL THEN NULL
+                ELSE ST_SetSRID(ST_GeomFromText(%s), COALESCE(%s, 0))
+            END,
+            %s,
+            CASE
+                WHEN %s IS NULL THEN NULL
+                ELSE ST_SetSRID(ST_GeomFromText(%s), 4326)
+            END,
+            %s
+        )
+        RETURNING feature_id
+    """
+    metadata_json = Json(metadata) if metadata is not None else None
+
+    result = execute_single(
+        query,
+        (
+            drawing_id,
+            project_id,
+            feature_type,
+            layer_name,
+            native_wkt,
+            native_wkt,
+            native_srid,
+            native_srid,
+            canonical_wkt,
+            canonical_wkt,
+            metadata_json,
+        ),
+    )
+    return result['feature_id'] if result else None
+
+
+def list_canonical_features(
+    drawing_id: str,
+    bbox: Optional[tuple] = None,
+    target_srid: Optional[int] = 4326,
+    simplify_tolerance: Optional[float] = None,
+    limit: Optional[int] = None
+) -> List[Dict]:
+    """
+    Return canonical features for a drawing, optionally filtered by bbox and simplified.
+    """
+    srid = target_srid or 4326
+    geom_expr = "geom"
+    params: List[Any] = []
+
+    if srid != 4326:
+        geom_expr = "ST_Transform(geom, %s)"
+        params.append(srid)
+
+    if simplify_tolerance and simplify_tolerance > 0:
+        geom_expr = f"ST_SimplifyPreserveTopology({geom_expr}, %s)"
+        params.append(simplify_tolerance)
+
+    query = f"""
+        SELECT
+            feature_id,
+            drawing_id,
+            project_id,
+            feature_type,
+            layer_name,
+            ST_AsGeoJSON({geom_expr}) AS geom,
+            metadata
+        FROM canonical_features
+        WHERE drawing_id = %s
+          AND geom IS NOT NULL
+    """
+    params.append(drawing_id)
+
+    if bbox:
+        query += """
+          AND geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)
+        """
+        params.extend(bbox)
+
+    query += """
+        ORDER BY feature_type, feature_id
+    """
+
+    if limit:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    return execute_query(query, tuple(params))
 
 # ============================================
 # PROJECTS

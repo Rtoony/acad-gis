@@ -28,7 +28,7 @@ Your ACAD-GIS development environment is fully configured and tested:
 H:\acad-gis\                           # Main project (Windows drive)
 ├── backend\                           # Python API server
 │   ├── .env                          # Database credentials
-│   ├── api_server_ENHANCED.py        # FastAPI server
+│   ├── api_server.py        # FastAPI server
 │   └── database.py                   # Database functions
 ├── frontend\
 │   ├── tools\                        # Individual mini-tools
@@ -205,7 +205,7 @@ cd /mnt/h/acad-gis/backend
 python3 database.py
 
 # Start API server
-python3 api_server_ENHANCED.py
+python3 api_server.py
 ```
 
 **API server output:**
@@ -284,7 +284,7 @@ Hi Rtoony! You've successfully authenticated, but GitHub does not provide shell 
 ### Start API Server (WSL Terminal)
 ```bash
 cd /mnt/h/acad-gis/backend
-python3 api_server_ENHANCED.py
+python3 api_server.py
 ```
 
 **Leave this running** - don't close the terminal.
@@ -496,7 +496,7 @@ Frontend:  /mnt/h/acad-gis/frontend
 # Start work
 cd /mnt/h/acad-gis/backend
 python3 database.py                    # Test connection
-python3 api_server_ENHANCED.py         # Start API
+python3 api_server.py         # Start API
 
 # Git
 git status                             # Check changes

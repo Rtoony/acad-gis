@@ -1,4 +1,11 @@
-from database import execute_query
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.append(str(Path(__file__).resolve().parent))
+    from database import execute_query  # type: ignore
+else:
+    from .database import execute_query  # type: ignore
 
 print("First 10 symbols in database:")
 symbols = execute_query(

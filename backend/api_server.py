@@ -3,7 +3,7 @@ ACAD=GIS Enhanced FastAPI Server
 Adds CRUD operations, file upload, and export functionality
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict, Any, Optional
@@ -13,9 +13,17 @@ import os
 import tempfile
 from datetime import datetime
 import json
+import sys
+from pathlib import Path
 
-# Import your database module
-import database
+# Support running via `python backend/api_server.py` and as package import.
+if __package__ in (None, ""):
+    sys.path.append(str(Path(__file__).resolve().parent))
+    import database  # type: ignore
+    from import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+else:
+    from . import database  # type: ignore
+    from .import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
 
 app = FastAPI(
     title="ACAD=GIS Enhanced API",
@@ -652,52 +660,146 @@ def get_drawing_render_data(drawing_id: str, limit: int = 2500):
         raise HTTPException(status_code=500, detail=f"Failed to get drawing data: {str(e)}")
 
 @app.get("/api/drawings/{drawing_id}/extent")
-def get_drawing_extent(drawing_id: str):
+def get_drawing_extent(drawing_id: str, srid: Optional[int] = Query(4326)):
     """Return full drawing bounds (no row limit) and EPSG code.
 
-    Bounds are computed from all block_inserts for the drawing. If no inserts
-    exist, returns count=0 and zero bounds so clients can handle gracefully.
+    Bounds are computed from canonical_features when available (transformed to the
+    requested SRID, default 4326). If no canonical data exists, falls back to
+    raw block inserts in native units.
     """
     try:
         drawing = database.get_drawing(drawing_id)
         if not drawing:
             raise HTTPException(status_code=404, detail="Drawing not found")
 
-        bounds_row = database.execute_single(
+        target_srid = int(srid) if srid else 4326
+
+        canonical_bounds = database.execute_single(
             """
             SELECT
-                MIN(insert_x) AS min_x,
-                MIN(insert_y) AS min_y,
-                MAX(insert_x) AS max_x,
-                MAX(insert_y) AS max_y,
-                COUNT(*)      AS feature_count
-            FROM block_inserts
+                ST_XMin(extent) AS min_x,
+                ST_YMin(extent) AS min_y,
+                ST_XMax(extent) AS max_x,
+                ST_YMax(extent) AS max_y,
+                feature_count
+            FROM (
+                SELECT
+                    ST_Extent(ST_Transform(geom, %s)) AS extent,
+                    COUNT(*) AS feature_count
+                FROM canonical_features
+                WHERE drawing_id = %s
+                  AND geom IS NOT NULL
+            ) AS bounds
+            """,
+            (target_srid, drawing_id)
+        )
+
+        if canonical_bounds and canonical_bounds.get("min_x") is not None:
+            bounds = {
+                "min_x": float(canonical_bounds["min_x"]),
+                "min_y": float(canonical_bounds["min_y"]),
+                "max_x": float(canonical_bounds["max_x"]),
+                "max_y": float(canonical_bounds["max_y"]),
+            }
+            feature_count = canonical_bounds.get("feature_count", 0)
+            source = "canonical_features"
+        else:
+            fallback = database.execute_single(
+                """
+                SELECT
+                    MIN(insert_x) AS min_x,
+                    MIN(insert_y) AS min_y,
+                    MAX(insert_x) AS max_x,
+                    MAX(insert_y) AS max_y,
+                    COUNT(*)      AS feature_count
+                FROM block_inserts
+                WHERE drawing_id = %s
+                """,
+                (drawing_id,)
+            )
+
+            feature_count = fallback.get('feature_count', 0) if fallback else 0
+            if not fallback or fallback['min_x'] is None or fallback['min_y'] is None:
+                bounds = {"min_x": 0, "min_y": 0, "max_x": 0, "max_y": 0}
+            else:
+                bounds = {
+                    "min_x": float(fallback['min_x']),
+                    "min_y": float(fallback['min_y']),
+                    "max_x": float(fallback['max_x']),
+                    "max_y": float(fallback['max_y'])
+                }
+            source = "block_inserts"
+
+        canonical_total_row = database.execute_single(
+            """
+            SELECT COUNT(*) AS canonical_count
+            FROM canonical_features
             WHERE drawing_id = %s
+              AND geom IS NOT NULL
             """,
             (drawing_id,)
         )
-
-        feature_count = bounds_row.get('feature_count', 0) if bounds_row else 0
-        if not bounds_row or bounds_row['min_x'] is None or bounds_row['min_y'] is None:
-            # No symbol data yet; return empty bounds
-            bounds = {"min_x": 0, "min_y": 0, "max_x": 0, "max_y": 0}
-        else:
-            bounds = {
-                "min_x": float(bounds_row['min_x']),
-                "min_y": float(bounds_row['min_y']),
-                "max_x": float(bounds_row['max_x']),
-                "max_y": float(bounds_row['max_y'])
-            }
+        canonical_total = canonical_total_row['canonical_count'] if canonical_total_row else 0
 
         return {
             "drawing_epsg_code": drawing.get('drawing_epsg_code'),
+            "requested_srid": target_srid,
             "bounds": bounds,
-            "stats": {"feature_count": feature_count}
+            "stats": {
+                "feature_count": feature_count,
+                "canonical_count": canonical_total,
+                "source": source
+            }
         }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get drawing extent: {str(e)}")
+
+
+@app.get("/api/drawings/{drawing_id}/geojson")
+def get_drawing_geojson(
+    drawing_id: str,
+    bbox: Optional[str] = Query(None, description="minx,miny,maxx,maxy in EPSG:4326"),
+    srid: Optional[int] = Query(4326, description="Target SRID for output"),
+    simplify: Optional[float] = Query(None, description="Simplification tolerance"),
+    limit: Optional[int] = Query(None, ge=1, le=10000)
+):
+    """Return canonical features as GeoJSON."""
+    try:
+        drawing = database.get_drawing(drawing_id)
+        if not drawing:
+            raise HTTPException(status_code=404, detail="Drawing not found")
+
+        bbox_values = parse_bbox(bbox)
+        target_srid = int(srid) if srid else 4326
+        tolerance = float(simplify) if simplify else None
+
+        rows = database.list_canonical_features(
+            drawing_id=drawing_id,
+            bbox=bbox_values,
+            target_srid=target_srid,
+            simplify_tolerance=tolerance,
+            limit=limit
+        )
+
+        collection = build_feature_collection(rows)
+        collection["count"] = len(rows)
+        collection["srid"] = target_srid
+        if bbox_values:
+            collection["request_bbox"] = bbox_values
+        if tolerance:
+            collection["simplify"] = tolerance
+        if limit:
+            collection["limit"] = limit
+        collection["source"] = "canonical_features"
+        collection["drawing_id"] = drawing_id
+
+        return collection
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build drawing GeoJSON: {str(e)}")
 
 def calculate_drawing_bounds(inserts):
     """Calculate bounding box for drawing"""
@@ -734,35 +836,63 @@ async def import_dxf(
     is_georeferenced: bool = Form(False),
     epsg_code: Optional[str] = Form(None)
 ):
-    """Import DXF file"""
+    """Import DXF file and persist canonical features."""
+    tmp_path = None
     try:
         # Validate file type
-        if not file.filename.endswith('.dxf'):
+        filename_lower = (file.filename or "").lower()
+        if not filename_lower.endswith('.dxf'):
             raise HTTPException(status_code=400, detail="Only DXF files are supported")
-        
+
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded DXF is empty")
+
         # Save file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.dxf') as tmp:
-            content = await file.read()
             tmp.write(content)
             tmp_path = tmp.name
-        
-        # TODO: Process DXF file using your import script
-        # For now, return a placeholder response
-        drawing_name = drawing_name or file.filename.replace('.dxf', '')
-        
+
+        override_epsg = None
+        if epsg_code:
+            try:
+                override_epsg = int(epsg_code)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="EPSG code must be numeric")
+
+        importer = GeoreferencedDXFImporter(
+            tmp_path,
+            project_id,
+            force_georef=is_georeferenced,
+            override_epsg=override_epsg
+        )
+
+        final_name = drawing_name or os.path.splitext(file.filename)[0]
+        drawing_id = importer.run(final_name)
+
         return {
             "success": True,
-            "message": f"DXF file '{file.filename}' uploaded successfully",
-            "drawing_name": drawing_name,
-            "file_size": len(content),
-            "note": "Processing functionality needs to be implemented"
+            "message": f"DXF file '{file.filename}' imported successfully",
+            "drawing_id": drawing_id,
+            "drawing_name": final_name,
+            "project_id": project_id,
+            "bytes_received": len(content),
+            "is_georeferenced": importer.is_georeferenced,
+            "epsg_code": importer.epsg_code,
+            "coordinate_system": importer.coordinate_system,
+            "stats": importer.stats
         }
-        
-        # Clean up temp file
-        # os.unlink(tmp_path)
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to import DXF: {str(e)}")
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 @app.get("/api/export/{drawing_id}")
 def export_drawing(drawing_id: str, format: str = "dxf"):

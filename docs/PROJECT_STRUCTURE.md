@@ -25,7 +25,7 @@ acad-gis/
 - `project-manager.html`, `drawing_browser.html`, `drawing-importer.html`, `map_viewer.html`
 
 ## Backend
-- `backend/api_server_ENHANCED.py` — FastAPI app and endpoints
+- `backend/api_server.py` — FastAPI app and endpoints
 - `backend/database.py` — DB helpers
 - Import scripts and tests under `backend/`
 

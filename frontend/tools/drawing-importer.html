@@ -43,6 +43,11 @@
       uploadWithProgress: async () => ({}),
     };
 
+    const extractNumericEpsg = (value = '') => {
+      const match = (value || '').match(/(\d{3,6})/);
+      return match ? match[1] : '';
+    };
+
     function DrawingImporter() {
       const [projects, setProjects] = useState([]);
       const [projectId, setProjectId] = useState('');
@@ -52,6 +57,7 @@
       const [progress, setProgress] = useState(0);
       const [uploading, setUploading] = useState(false);
       const [error, setError] = useState('');
+      const [results, setResults] = useState([]);
 
       useEffect(() => {
         (async () => {
@@ -63,26 +69,53 @@
       const onDrop = (e) => {
         e.preventDefault();
         setFiles(Array.from(e.dataTransfer.files));
+        setResults([]);
       };
-      const onPick = (e) => setFiles(Array.from(e.target.files || []));
+      const onPick = (e) => { setFiles(Array.from(e.target.files || [])); setResults([]); };
 
       const upload = async () => {
         if (!projectId) { Toast.warning('Select a project first'); return; }
         if (files.length === 0) { Toast.warning('Choose at least one file'); return; }
-        setError(''); setUploading(true); setProgress(0);
+        setError(''); setUploading(true); setProgress(0); setResults([]);
+        const summary = [];
         try {
-          const form = new FormData();
-          files.forEach((f) => form.append('file', f));
-          form.append('project_id', projectId);
-          form.append('is_georeferenced', String(isGeo));
-          form.append('epsg_code', epsg);
-          const res = await apiClient.uploadWithProgress('/import/dxf', form, (pct) => setProgress(pct));
-          Toast.success('Import complete');
-          console.log('Upload response', res);
+          const total = files.length;
+          const epsgNumeric = extractNumericEpsg(epsg);
+
+          for (let index = 0; index < total; index += 1) {
+            const file = files[index];
+            const form = new FormData();
+            form.append('file', file);
+            form.append('project_id', projectId);
+            form.append('drawing_name', file.name.replace(/\.[^.]+$/i, ''));
+            form.append('is_georeferenced', String(isGeo));
+            if (epsgNumeric) form.append('epsg_code', epsgNumeric);
+
+            const res = await apiClient.uploadWithProgress('/import/dxf', form, (pct) => {
+              const overall = Math.round(((index + (pct / 100)) / total) * 100);
+              setProgress(Math.min(overall, 100));
+            });
+
+            summary.push({
+              file: file.name,
+              drawingName: res?.drawing_name,
+              drawingId: res?.drawing_id,
+              stats: res?.stats,
+              georeferenced: res?.is_georeferenced,
+              epsg: res?.epsg_code,
+            });
+          }
+
+          setProgress(100);
+          Toast.success(`Imported ${summary.length} file${summary.length === 1 ? '' : 's'}`);
         } catch (e) {
           setError(e.message || 'Upload failed');
           Toast.error('Upload failed');
-        } finally { setUploading(false); }
+          setProgress(0);
+        } finally {
+          setResults(summary);
+          setUploading(false);
+        }
       };
 
       return (
@@ -144,8 +177,14 @@
                   ),
                   React.createElement('div', { className: 'text-muted mt-sm' }, `${progress}%`)
                 ),
+                results.length > 0 && React.createElement('div', { className: 'mt-md' },
+                  React.createElement('div', { className: 'card-subtitle text-muted mb-sm' }, 'Recent Imports'),
+                  React.createElement('ul', { className: 'small' }, results.map((r, idx) =>
+                    React.createElement('li', { key: r.drawingId || `${r.file}-${idx}` }, `${r.file} → ${r.drawingName || 'new drawing'} | Canonical: ${r.stats?.canonical_features ?? 0} | EPSG:${r.epsg || '—'}`)
+                  ))
+                ),
                 React.createElement('div', { className: 'card-footer flex', style: { justifyContent: 'flex-end', gap: '8px' } },
-                  React.createElement('button', { className: 'btn btn-ghost', disabled: uploading, onClick: () => { setFiles([]); setProgress(0); } }, 'Clear'),
+                  React.createElement('button', { className: 'btn btn-ghost', disabled: uploading, onClick: () => { setFiles([]); setProgress(0); setResults([]); } }, 'Clear'),
                   React.createElement('button', { className: 'btn btn-primary', disabled: uploading, onClick: upload },
                     React.createElement('i', { className: 'fas fa-upload' }), ' Upload'
                   )

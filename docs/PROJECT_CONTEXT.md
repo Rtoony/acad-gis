@@ -473,7 +473,7 @@ app.add_middleware(
 ### Backend (Python)
 ```
 snake_case.py           # Python modules
-api_server_ENHANCED.py  # Main files (descriptive)
+api_server.py  # Main files (descriptive)
 ```
 
 ### Frontend (HTML/JS/CSS)

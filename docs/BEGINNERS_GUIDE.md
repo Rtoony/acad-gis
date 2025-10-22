@@ -29,7 +29,7 @@ ACAD‑GIS is a web-based system for managing CAD drawings with GIS context. The
 - Civil tools (beta): Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager. They read from the new civil tables and expose basic CRUD + GeoJSON endpoints (some advanced actions still roadmap items).
 
 ## Where Things Live (Repo Map)
-- Backend (API): `backend/api_server_ENHANCED.py`, DB helpers `backend/database.py`.
+- Backend (API): `backend/api_server.py`, DB helpers `backend/database.py`.
 - Frontend (tools): `frontend/tools/*.html` (each tool is its own page).
 - Shared frontend: `frontend/shared/styles.css`, `frontend/shared/components.js`, `frontend/shared/api.js`, `frontend/shared/react-components.js`.
 - Docs: `docs/` (roadmap, setup guides, API, schema, Civil tools plan, this guide).
@@ -37,7 +37,7 @@ ACAD‑GIS is a web-based system for managing CAD drawings with GIS context. The
 
 ## Run It Locally (Dev)
 1) Start the API server
-- In your Python env: `python backend/api_server_ENHANCED.py`
+- In your Python env: `python backend/api_server.py`
 - You should see: `Server running at: http://localhost:8000`
 - Open API docs: `http://localhost:8000/docs`
 
