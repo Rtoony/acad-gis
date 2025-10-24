@@ -179,9 +179,8 @@ class PipeNetworkValidator:
             SELECT
                 structure_id,
                 network_id,
-                structure_type,
+                type,
                 rim_elev,
-                invert_elev,
                 sump_depth,
                 ST_AsText(geom) as geom_wkt,
                 ST_X(geom) as x,
@@ -241,41 +240,44 @@ class PipeNetworkValidator:
                 ))
 
             # Check invert continuity at connections
-            if pipe.get('up_structure_id') and pipe.get('invert_up') is not None:
-                upstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['up_structure_id']), None)
-                if upstream_struct and upstream_struct.get('invert_elev') is not None:
-                    mismatch = abs(float(pipe['invert_up']) - float(upstream_struct['invert_elev']))
-                    max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
-
-                    if mismatch > max_mismatch:
-                        result.add_issue(ValidationIssue(
-                            severity=Severity.WARNING,
-                            category="continuity",
-                            code="INVERT_MISMATCH_UPSTREAM",
-                            message=f"Invert mismatch at upstream connection: {mismatch:.2f} ft",
-                            pipe_id=pipe_id,
-                            structure_id=pipe['up_structure_id'],
-                            expected_value=float(upstream_struct['invert_elev']),
-                            actual_value=float(pipe['invert_up'])
-                        ))
-
-            if pipe.get('down_structure_id') and pipe.get('invert_dn') is not None:
-                downstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['down_structure_id']), None)
-                if downstream_struct and downstream_struct.get('invert_elev') is not None:
-                    mismatch = abs(float(pipe['invert_dn']) - float(downstream_struct['invert_elev']))
-                    max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
-
-                    if mismatch > max_mismatch:
-                        result.add_issue(ValidationIssue(
-                            severity=Severity.WARNING,
-                            category="continuity",
-                            code="INVERT_MISMATCH_DOWNSTREAM",
-                            message=f"Invert mismatch at downstream connection: {mismatch:.2f} ft",
-                            pipe_id=pipe_id,
-                            structure_id=pipe['down_structure_id'],
-                            expected_value=float(downstream_struct['invert_elev']),
-                            actual_value=float(pipe['invert_dn'])
-                        ))
+            # NOTE: Disabled - structures table does not have invert_elev column
+            # This check would require calculating structure inverts from connected pipes
+            # or adding invert_elev column to structures table
+            # if pipe.get('up_structure_id') and pipe.get('invert_up') is not None:
+            #     upstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['up_structure_id']), None)
+            #     if upstream_struct and upstream_struct.get('invert_elev') is not None:
+            #         mismatch = abs(float(pipe['invert_up']) - float(upstream_struct['invert_elev']))
+            #         max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
+            #
+            #         if mismatch > max_mismatch:
+            #             result.add_issue(ValidationIssue(
+            #                 severity=Severity.WARNING,
+            #                 category="continuity",
+            #                 code="INVERT_MISMATCH_UPSTREAM",
+            #                 message=f"Invert mismatch at upstream connection: {mismatch:.2f} ft",
+            #                 pipe_id=pipe_id,
+            #                 structure_id=pipe['up_structure_id'],
+            #                 expected_value=float(upstream_struct['invert_elev']),
+            #                 actual_value=float(pipe['invert_up'])
+            #             ))
+            #
+            # if pipe.get('down_structure_id') and pipe.get('invert_dn') is not None:
+            #     downstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['down_structure_id']), None)
+            #     if downstream_struct and downstream_struct.get('invert_elev') is not None:
+            #         mismatch = abs(float(pipe['invert_dn']) - float(downstream_struct['invert_elev']))
+            #         max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
+            #
+            #         if mismatch > max_mismatch:
+            #             result.add_issue(ValidationIssue(
+            #                 severity=Severity.WARNING,
+            #                 category="continuity",
+            #                 code="INVERT_MISMATCH_DOWNSTREAM",
+            #                 message=f"Invert mismatch at downstream connection: {mismatch:.2f} ft",
+            #                 pipe_id=pipe_id,
+            #                 structure_id=pipe['down_structure_id'],
+            #                 expected_value=float(downstream_struct['invert_elev']),
+            #                 actual_value=float(pipe['invert_dn'])
+            #             ))
 
     def _check_hydraulics(self, result: ValidationResult):
         """Check hydraulic performance (velocity, slope, capacity)."""
