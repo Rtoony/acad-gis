@@ -146,6 +146,10 @@ class AlignmentCreate(BaseModel):
     station_start: Optional[float] = None
     geom: Optional[Any] = None
 
+class ValidationRequest(BaseModel):
+    network_id: str
+    standards: Optional[str] = "default"
+
 class BMPCreate(BaseModel):
     project_id: Optional[str] = None
     type: Optional[str] = None
@@ -1444,7 +1448,7 @@ def validate_pipe_slope(scope: Dict[str, Any]):
 
 
 @app.post("/api/validate/pipe-network")
-def validate_network_comprehensive(request: Dict[str, Any] = Body(...)):
+def validate_network_comprehensive(request: ValidationRequest):
     """
     Comprehensive pipe network validation.
 
@@ -1474,12 +1478,10 @@ def validate_network_comprehensive(request: Dict[str, Any] = Body(...)):
         }
     }
     """
-    network_id = request.get('network_id')
-    if not network_id:
-        raise HTTPException(status_code=400, detail="network_id is required")
+    network_id = request.network_id
 
     # Select standards
-    standards_type = request.get('standards', 'default').lower()
+    standards_type = request.standards.lower()
     if standards_type == 'strict':
         standards = STRICT_STANDARDS
     else:
