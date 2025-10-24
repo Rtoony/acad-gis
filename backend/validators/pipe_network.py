@@ -162,8 +162,8 @@ class PipeNetworkValidator:
                 invert_up,
                 invert_dn,
                 status,
-                structure_up,
-                structure_dn,
+                up_structure_id,
+                down_structure_id,
                 ST_AsText(geom) as geom_wkt,
                 ST_X(ST_StartPoint(geom)) as start_x,
                 ST_Y(ST_StartPoint(geom)) as start_y,
@@ -179,7 +179,7 @@ class PipeNetworkValidator:
             SELECT
                 structure_id,
                 network_id,
-                structure_type,
+                type,
                 rim_elev,
                 invert_elev,
                 sump_depth,
@@ -199,15 +199,15 @@ class PipeNetworkValidator:
             pipe_id = pipe['pipe_id']
 
             # Check upstream connection
-            if pipe.get('structure_up'):
-                if pipe['structure_up'] not in structure_ids:
+            if pipe.get('up_structure_id'):
+                if pipe['up_structure_id'] not in structure_ids:
                     result.add_issue(ValidationIssue(
                         severity=Severity.ERROR,
                         category="continuity",
                         code="MISSING_UPSTREAM_STRUCTURE",
                         message=f"Pipe references non-existent upstream structure",
                         pipe_id=pipe_id,
-                        structure_id=pipe['structure_up']
+                        structure_id=pipe['up_structure_id']
                     ))
             else:
                 # Pipe has no upstream structure
@@ -220,15 +220,15 @@ class PipeNetworkValidator:
                 ))
 
             # Check downstream connection
-            if pipe.get('structure_dn'):
-                if pipe['structure_dn'] not in structure_ids:
+            if pipe.get('down_structure_id'):
+                if pipe['down_structure_id'] not in structure_ids:
                     result.add_issue(ValidationIssue(
                         severity=Severity.ERROR,
                         category="continuity",
                         code="MISSING_DOWNSTREAM_STRUCTURE",
                         message=f"Pipe references non-existent downstream structure",
                         pipe_id=pipe_id,
-                        structure_id=pipe['structure_dn']
+                        structure_id=pipe['down_structure_id']
                     ))
             else:
                 # Pipe has no downstream structure
@@ -241,8 +241,8 @@ class PipeNetworkValidator:
                 ))
 
             # Check invert continuity at connections
-            if pipe.get('structure_up') and pipe.get('invert_up') is not None:
-                upstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['structure_up']), None)
+            if pipe.get('up_structure_id') and pipe.get('invert_up') is not None:
+                upstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['up_structure_id']), None)
                 if upstream_struct and upstream_struct.get('invert_elev') is not None:
                     mismatch = abs(float(pipe['invert_up']) - float(upstream_struct['invert_elev']))
                     max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
@@ -254,13 +254,13 @@ class PipeNetworkValidator:
                             code="INVERT_MISMATCH_UPSTREAM",
                             message=f"Invert mismatch at upstream connection: {mismatch:.2f} ft",
                             pipe_id=pipe_id,
-                            structure_id=pipe['structure_up'],
+                            structure_id=pipe['up_structure_id'],
                             expected_value=float(upstream_struct['invert_elev']),
                             actual_value=float(pipe['invert_up'])
                         ))
 
-            if pipe.get('structure_dn') and pipe.get('invert_dn') is not None:
-                downstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['structure_dn']), None)
+            if pipe.get('down_structure_id') and pipe.get('invert_dn') is not None:
+                downstream_struct = next((s for s in self.structures if s['structure_id'] == pipe['down_structure_id']), None)
                 if downstream_struct and downstream_struct.get('invert_elev') is not None:
                     mismatch = abs(float(pipe['invert_dn']) - float(downstream_struct['invert_elev']))
                     max_mismatch = self.standards.pipe_standards.max_invert_mismatch_ft
@@ -272,7 +272,7 @@ class PipeNetworkValidator:
                             code="INVERT_MISMATCH_DOWNSTREAM",
                             message=f"Invert mismatch at downstream connection: {mismatch:.2f} ft",
                             pipe_id=pipe_id,
-                            structure_id=pipe['structure_dn'],
+                            structure_id=pipe['down_structure_id'],
                             expected_value=float(downstream_struct['invert_elev']),
                             actual_value=float(pipe['invert_dn'])
                         ))
@@ -420,14 +420,14 @@ class PipeNetworkValidator:
         # Build adjacency map
         pipe_by_upstream: Dict[str, List[Dict]] = {}
         for pipe in self.pipes:
-            up_struct = pipe.get('structure_up')
+            up_struct = pipe.get('up_structure_id')
             if up_struct:
                 if up_struct not in pipe_by_upstream:
                     pipe_by_upstream[up_struct] = []
                 pipe_by_upstream[up_struct].append(pipe)
 
         for pipe in self.pipes:
-            dn_struct = pipe.get('structure_dn')
+            dn_struct = pipe.get('down_structure_id')
             if not dn_struct or pipe.get('diameter_mm') is None:
                 continue
 
@@ -503,8 +503,8 @@ class PipeNetworkValidator:
             graph[structure['structure_id']] = []
 
         for pipe in self.pipes:
-            up_struct = pipe.get('structure_up')
-            dn_struct = pipe.get('structure_dn')
+            up_struct = pipe.get('up_structure_id')
+            dn_struct = pipe.get('down_structure_id')
 
             if up_struct and dn_struct:
                 if up_struct not in graph:
@@ -520,7 +520,7 @@ class PipeNetworkValidator:
             if len(downstream) == 0:
                 # Check if this structure actually has pipes flowing TO it
                 has_incoming = any(
-                    pipe.get('structure_dn') == struct_id
+                    pipe.get('down_structure_id') == struct_id
                     for pipe in self.pipes
                 )
                 if has_incoming:

@@ -3,7 +3,7 @@ ACAD=GIS Enhanced FastAPI Server
 Adds CRUD operations, file upload, and export functionality
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict, Any, Optional
@@ -145,6 +145,10 @@ class AlignmentCreate(BaseModel):
     srid: Optional[int] = None
     station_start: Optional[float] = None
     geom: Optional[Any] = None
+
+class ValidationRequest(BaseModel):
+    network_id: str
+    standards: Optional[str] = "default"
 
 class BMPCreate(BaseModel):
     project_id: Optional[str] = None
@@ -1444,7 +1448,7 @@ def validate_pipe_slope(scope: Dict[str, Any]):
 
 
 @app.post("/api/validate/pipe-network")
-def validate_network_comprehensive(request: Dict[str, Any]):
+def validate_network_comprehensive(request: ValidationRequest):
     """
     Comprehensive pipe network validation.
 
@@ -1474,12 +1478,10 @@ def validate_network_comprehensive(request: Dict[str, Any]):
         }
     }
     """
-    network_id = request.get('network_id')
-    if not network_id:
-        raise HTTPException(status_code=400, detail="network_id is required")
+    network_id = request.network_id
 
     # Select standards
-    standards_type = request.get('standards', 'default').lower()
+    standards_type = request.standards.lower()
     if standards_type == 'strict':
         standards = STRICT_STANDARDS
     else:
@@ -1495,7 +1497,7 @@ def validate_network_comprehensive(request: Dict[str, Any]):
         return {
             "success": True,
             "result": result_dict,
-            "message": f"Validated network: {result.summary['total_issues']} issues found ({result.summary['errors']} errors, {result.summary['warnings']} warnings)"
+            "message": f"Validated network: {result_dict['summary']['total_issues']} issues found ({result_dict['summary']['errors']} errors, {result_dict['summary']['warnings']} warnings)"
         }
 
     except Exception as e:

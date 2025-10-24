@@ -22,22 +22,39 @@ else:
 def run():
     migrations_dir = Path(__file__).parent / "migrations"
     if not migrations_dir.exists():
-        print("No migrations directory found; nothing to run.")
+        print("❌ No migrations directory found; nothing to run.")
         return
 
     files = sorted(p for p in migrations_dir.glob("*.sql"))
     if not files:
-        print("No migration files discovered.")
+        print("⚠️  No migration files discovered.")
         return
 
-    print(f"Running {len(files)} migration(s)...")
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            for path in files:
-                sql = path.read_text()
-                print(f"  → {path.name}")
-                cur.execute(sql)
-    print("✅ Migrations complete.")
+    print("=" * 60)
+    print("🚀 ACAD-GIS Database Migration Runner")
+    print("=" * 60)
+    print(f"\n📋 Found {len(files)} migration file(s):")
+    for f in files:
+        print(f"   - {f.name}")
+
+    print(f"\n🔄 Applying migrations to database...")
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                for path in files:
+                    sql = path.read_text()
+                    print(f"  📄 Applying: {path.name}...", end=" ")
+                    cur.execute(sql)
+                    print("✅")
+        print("\n" + "=" * 60)
+        print("🎉 All migrations completed successfully!")
+        print("=" * 60)
+    except Exception as e:
+        print(f"\n❌ Migration failed!")
+        print(f"   Error: {str(e)}")
+        print("\n" + "=" * 60)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

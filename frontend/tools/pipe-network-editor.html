@@ -108,8 +108,10 @@
         setValidationLoading(true);
         try {
           const response = await API.request('POST', '/validate/pipe-network', {
-            network_id: selected.network_id,
-            standards: validationStandards
+            data: {
+              network_id: selected.network_id,
+              standards: validationStandards
+            }
           });
           setValidationResult(response.result);
           setShowValidation(true);
