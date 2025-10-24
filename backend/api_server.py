@@ -3,7 +3,7 @@ ACAD=GIS Enhanced FastAPI Server
 Adds CRUD operations, file upload, and export functionality
 """
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from typing import List, Dict, Any, Optional
@@ -1444,7 +1444,7 @@ def validate_pipe_slope(scope: Dict[str, Any]):
 
 
 @app.post("/api/validate/pipe-network")
-def validate_network_comprehensive(request: Dict[str, Any]):
+def validate_network_comprehensive(request: Dict[str, Any] = Body(...)):
     """
     Comprehensive pipe network validation.
 
