@@ -418,8 +418,8 @@
                   const x = toX(struct.longitude);
                   const y = toY(struct.latitude);
                   const label = struct.metadata && struct.metadata.label ? struct.metadata.label : struct.structure_id.slice(0, 8);
-                  const rimElev = struct.rim_elev !== null ? struct.rim_elev.toFixed(2) : '-';
-                  const invertElev = struct.invert_elev !== null ? struct.invert_elev.toFixed(2) : '-';
+                  const rimElev = (struct.rim_elev !== null && struct.rim_elev !== undefined) ? struct.rim_elev.toFixed(2) : '-';
+                  const invertElev = (struct.invert_elev !== null && struct.invert_elev !== undefined) ? struct.invert_elev.toFixed(2) : '-';
 
                   return React.createElement('g', { key: `struct-${idx}` },
                     // Structure circle
