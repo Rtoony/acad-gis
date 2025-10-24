@@ -34,9 +34,13 @@ if __package__ in (None, ""):
     sys.path.append(str(Path(__file__).resolve().parent))
     import database  # type: ignore
     from import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+    from validators.pipe_network import validate_pipe_network, Severity  # type: ignore
+    from validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
 else:
     from . import database  # type: ignore
     from .import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+    from .validators.pipe_network import validate_pipe_network, Severity  # type: ignore
+    from .validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
 
 app = FastAPI(
     title="ACAD=GIS Enhanced API",
@@ -1437,6 +1441,129 @@ def validate_pipe_slope(scope: Dict[str, Any]):
     }
 
     return {"success": True, "message": message, "results": results, "violations": violations, "summary": summary}
+
+
+@app.post("/api/validate/pipe-network")
+def validate_network_comprehensive(request: Dict[str, Any]):
+    """
+    Comprehensive pipe network validation.
+
+    Validates continuity, hydraulics, standards compliance, topology, and geometry.
+
+    Request body:
+    {
+        "network_id": "uuid",
+        "standards": "default" | "strict" (optional, defaults to "default")
+    }
+
+    Returns:
+    {
+        "success": true,
+        "result": {
+            "network_id": "uuid",
+            "network_name": "...",
+            "is_valid": true/false,
+            "issues": [...],
+            "statistics": {...},
+            "summary": {
+                "total_issues": 0,
+                "errors": 0,
+                "warnings": 0,
+                "info": 0
+            }
+        }
+    }
+    """
+    network_id = request.get('network_id')
+    if not network_id:
+        raise HTTPException(status_code=400, detail="network_id is required")
+
+    # Select standards
+    standards_type = request.get('standards', 'default').lower()
+    if standards_type == 'strict':
+        standards = STRICT_STANDARDS
+    else:
+        standards = DEFAULT_STANDARDS
+
+    try:
+        # Run comprehensive validation
+        result = validate_pipe_network(network_id, standards)
+
+        # Convert to dict for JSON response
+        result_dict = result.to_dict()
+
+        return {
+            "success": True,
+            "result": result_dict,
+            "message": f"Validated network: {result.summary['total_issues']} issues found ({result.summary['errors']} errors, {result.summary['warnings']} warnings)"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+@app.get("/api/validate/pipe-network/{network_id}")
+def get_network_validation(network_id: str, standards: str = Query("default", description="Standards to use: 'default' or 'strict'")):
+    """
+    GET endpoint for comprehensive pipe network validation.
+
+    Query parameters:
+    - standards: "default" or "strict"
+
+    Returns validation results for the specified network.
+    """
+    standards_type = standards.lower()
+    if standards_type == 'strict':
+        standards_obj = STRICT_STANDARDS
+    else:
+        standards_obj = DEFAULT_STANDARDS
+
+    try:
+        result = validate_pipe_network(network_id, standards_obj)
+        result_dict = result.to_dict()
+
+        return {
+            "success": True,
+            "result": result_dict,
+            "message": f"Validated network: {result_dict['summary']['total_issues']} issues found"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+@app.get("/api/validate/standards")
+def get_validation_standards():
+    """
+    Get information about available validation standards.
+
+    Returns details about design standards and their rules.
+    """
+    return {
+        "success": True,
+        "standards": {
+            "default": {
+                "name": DEFAULT_STANDARDS.jurisdiction_name,
+                "min_diameter_in": DEFAULT_STANDARDS.pipe_standards.min_diameter_in,
+                "min_velocity_fps": DEFAULT_STANDARDS.pipe_standards.min_velocity_fps,
+                "max_velocity_fps": DEFAULT_STANDARDS.pipe_standards.max_velocity_fps,
+                "min_cover_ft": DEFAULT_STANDARDS.pipe_standards.min_cover_ft,
+                "max_slope_percent": DEFAULT_STANDARDS.pipe_standards.max_slope_percent,
+                "notes": DEFAULT_STANDARDS.notes
+            },
+            "strict": {
+                "name": STRICT_STANDARDS.jurisdiction_name,
+                "min_diameter_in": STRICT_STANDARDS.pipe_standards.min_diameter_in,
+                "min_velocity_fps": STRICT_STANDARDS.pipe_standards.min_velocity_fps,
+                "max_velocity_fps": STRICT_STANDARDS.pipe_standards.max_velocity_fps,
+                "min_cover_ft": STRICT_STANDARDS.pipe_standards.min_cover_ft,
+                "max_slope_percent": STRICT_STANDARDS.pipe_standards.max_slope_percent,
+                "notes": STRICT_STANDARDS.notes
+            }
+        },
+        "min_slopes_by_diameter": DEFAULT_STANDARDS.pipe_standards.MIN_SLOPES_BY_DIAMETER,
+        "standard_diameters": DEFAULT_STANDARDS.pipe_standards.STANDARD_DIAMETERS
+    }
 
 def validate_velocity(scope: Dict[str, Any]):
     return {"success": False, "message": "Velocity validation not implemented yet", "results": []}

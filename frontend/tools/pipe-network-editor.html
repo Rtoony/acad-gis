@@ -39,6 +39,10 @@
       const [detail, setDetail] = useState(null);
       const [detailError, setDetailError] = useState('');
       const [loadingDetail, setLoadingDetail] = useState(false);
+      const [validationResult, setValidationResult] = useState(null);
+      const [validationLoading, setValidationLoading] = useState(false);
+      const [validationStandards, setValidationStandards] = useState('default');
+      const [showValidation, setShowValidation] = useState(false);
 
       const formatPercent = (value) => (value === null || value === undefined) ? '-' : `${(value * 100).toFixed(2)}%`;
       const formatNumber = (value) => (value === null || value === undefined) ? '-' : Number(value).toLocaleString();
@@ -99,6 +103,23 @@
         await fetchDetail(row.network_id, row);
       };
 
+      const runValidation = async () => {
+        if (!selected) return;
+        setValidationLoading(true);
+        try {
+          const response = await API.request('POST', '/validate/pipe-network', {
+            network_id: selected.network_id,
+            standards: validationStandards
+          });
+          setValidationResult(response.result);
+          setShowValidation(true);
+        } catch (e) {
+          alert('Validation failed: ' + (e.message || 'Unknown error'));
+        } finally {
+          setValidationLoading(false);
+        }
+      };
+
       const columns = [
         { key: 'name', label: 'Network' },
         { key: 'project_name', label: 'Project' },
@@ -143,7 +164,7 @@
         const margin = pipe.slope_margin;
         const marginClass = margin !== null && margin < 0 ? { color: '#ef4444', fontWeight: 600 } : { color: '#22c55e' };
         return React.createElement('tr', { key: pipe.pipe_id },
-          React.createElement('td', null, pipe.pipe_id.slice(0, 8) + '…'),
+          React.createElement('td', null, pipe.pipe_id.slice(0, 8) + 'ï¿½'),
           React.createElement('td', null, pipe.diameter_mm ? `${Math.round(pipe.diameter_mm)} mm` : '-'),
           React.createElement('td', null, pipe.material || '-'),
           React.createElement('td', null, formatPercent(pipe.slope)),
@@ -168,7 +189,7 @@
 
       const renderStructureRow = (structure) => {
         return React.createElement('tr', { key: structure.structure_id },
-          React.createElement('td', null, structure.structure_id.slice(0, 8) + '…'),
+          React.createElement('td', null, structure.structure_id.slice(0, 8) + 'ï¿½'),
           React.createElement('td', null, structure.type || '-'),
           React.createElement('td', null, structure.metadata && structure.metadata.label ? structure.metadata.label : '-'),
           React.createElement('td', null, structure.rim_elev !== null ? structure.rim_elev.toFixed(2) : '-'),
@@ -179,10 +200,197 @@
       const renderConflict = (conflict) => (
         React.createElement('li', { key: conflict.conflict_id, style: { marginBottom: '8px' } },
           React.createElement('strong', null, conflict.description),
-          conflict.company ? ` – ${conflict.company}` : '',
+          conflict.company ? ` ï¿½ ${conflict.company}` : '',
           conflict.suggestions && conflict.suggestions.length ? React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--color-text-muted)' } }, `Suggestions: ${conflict.suggestions.join('; ')}`) : null
         )
       );
+
+      const getSeverityColor = (severity) => {
+        switch (severity) {
+          case 'error': return '#ef4444';
+          case 'warning': return '#f59e0b';
+          case 'info': return '#3b82f6';
+          default: return '#6b7280';
+        }
+      };
+
+      const getSeverityIcon = (severity) => {
+        switch (severity) {
+          case 'error': return 'circle-xmark';
+          case 'warning': return 'triangle-exclamation';
+          case 'info': return 'circle-info';
+          default: return 'circle';
+        }
+      };
+
+      const renderValidationIssue = (issue, index) => {
+        const color = getSeverityColor(issue.severity);
+        const icon = getSeverityIcon(issue.severity);
+
+        return React.createElement('div', {
+          key: index,
+          style: {
+            padding: '12px',
+            marginBottom: '8px',
+            borderLeft: `4px solid ${color}`,
+            background: 'rgba(255,255,255,0.05)',
+            borderRadius: '4px'
+          }
+        },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '12px' } },
+            React.createElement('i', {
+              className: `fas fa-${icon}`,
+              style: { color, marginTop: '2px', fontSize: '16px' }
+            }),
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { fontWeight: 600, marginBottom: '4px' } },
+                `[${issue.category.toUpperCase()}] ${issue.code}`
+              ),
+              React.createElement('div', { style: { marginBottom: '4px' } }, issue.message),
+              (issue.pipe_id || issue.structure_id) && React.createElement('div', {
+                style: { fontSize: '0.85rem', color: 'var(--color-text-muted)' }
+              },
+                issue.pipe_id && `Pipe: ${issue.pipe_id.slice(0, 8)}`,
+                issue.structure_id && `Structure: ${issue.structure_id.slice(0, 8)}`
+              ),
+              (issue.expected_value !== null || issue.actual_value !== null) && React.createElement('div', {
+                style: { fontSize: '0.85rem', marginTop: '4px', color: 'var(--color-text-muted)' }
+              },
+                issue.expected_value !== null && issue.expected_value !== undefined && `Expected: ${issue.expected_value.toFixed(2)}`,
+                issue.expected_value !== null && issue.expected_value !== undefined && issue.actual_value !== null && issue.actual_value !== undefined && ' | ',
+                issue.actual_value !== null && issue.actual_value !== undefined && `Actual: ${issue.actual_value.toFixed(2)}`
+              )
+            )
+          )
+        );
+      };
+
+      const renderValidationResults = () => {
+        if (!validationResult) return null;
+
+        const { summary, issues, statistics, is_valid } = validationResult;
+
+        const issuesByCategory = {
+          continuity: issues.filter(i => i.category === 'continuity'),
+          hydraulic: issues.filter(i => i.category === 'hydraulic'),
+          standards: issues.filter(i => i.category === 'standards'),
+          topology: issues.filter(i => i.category === 'topology'),
+          geometry: issues.filter(i => i.category === 'geometry')
+        };
+
+        return React.createElement('div', { className: 'card mt-md' },
+          React.createElement('div', { className: 'card-header' },
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+            },
+              React.createElement('div', { className: 'card-title' }, 'Comprehensive Validation Results'),
+              React.createElement('button', {
+                className: 'btn btn-sm',
+                onClick: () => setShowValidation(false)
+              }, 'Close')
+            )
+          ),
+          React.createElement('div', { className: 'card-body' },
+            React.createElement('div', { className: 'grid grid-cols-4 gap-md mb-md' },
+              React.createElement('div', {
+                style: {
+                  padding: '16px',
+                  background: is_valid ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                  borderRadius: '8px',
+                  border: `2px solid ${is_valid ? '#22c55e' : '#ef4444'}`
+                }
+              },
+                React.createElement('div', { style: { fontSize: '0.85rem', marginBottom: '4px', color: 'var(--color-text-muted)' } }, 'Status'),
+                React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: is_valid ? '#22c55e' : '#ef4444' } },
+                  React.createElement('i', { className: `fas fa-${is_valid ? 'check-circle' : 'times-circle'}`, style: { marginRight: '8px' } }),
+                  is_valid ? 'Valid' : 'Issues Found'
+                )
+              ),
+              React.createElement('div', {
+                style: { padding: '16px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }
+              },
+                React.createElement('div', { style: { fontSize: '0.85rem', marginBottom: '4px', color: 'var(--color-text-muted)' } }, 'Errors'),
+                React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: '#ef4444' } },
+                  summary.errors
+                )
+              ),
+              React.createElement('div', {
+                style: { padding: '16px', background: 'rgba(245,158,11,0.1)', borderRadius: '8px' }
+              },
+                React.createElement('div', { style: { fontSize: '0.85rem', marginBottom: '4px', color: 'var(--color-text-muted)' } }, 'Warnings'),
+                React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: '#f59e0b' } },
+                  summary.warnings
+                )
+              ),
+              React.createElement('div', {
+                style: { padding: '16px', background: 'rgba(59,130,246,0.1)', borderRadius: '8px' }
+              },
+                React.createElement('div', { style: { fontSize: '0.85rem', marginBottom: '4px', color: 'var(--color-text-muted)' } }, 'Info'),
+                React.createElement('div', { style: { fontSize: '1.5rem', fontWeight: 700, color: '#3b82f6' } },
+                  summary.info
+                )
+              )
+            ),
+
+            statistics && React.createElement('div', { className: 'mb-md', style: { padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' } },
+              React.createElement('h4', { style: { marginBottom: '12px' } }, 'Network Statistics'),
+              React.createElement('div', { className: 'grid grid-cols-3 gap-md' },
+                React.createElement('div', null,
+                  React.createElement('div', { style: { fontSize: '0.85rem', color: 'var(--color-text-muted)' } }, 'Total Pipes'),
+                  React.createElement('div', { style: { fontSize: '1.25rem', fontWeight: 600 } }, statistics.total_pipes)
+                ),
+                React.createElement('div', null,
+                  React.createElement('div', { style: { fontSize: '0.85rem', color: 'var(--color-text-muted)' } }, 'Total Length'),
+                  React.createElement('div', { style: { fontSize: '1.25rem', fontWeight: 600 } },
+                    statistics.total_length_ft ? `${statistics.total_length_ft.toFixed(0)} ft` : '-'
+                  )
+                ),
+                React.createElement('div', null,
+                  React.createElement('div', { style: { fontSize: '0.85rem', color: 'var(--color-text-muted)' } }, 'Avg Velocity'),
+                  React.createElement('div', { style: { fontSize: '1.25rem', fontWeight: 600 } },
+                    statistics.calculated_velocities_fps && statistics.calculated_velocities_fps.avg
+                      ? `${statistics.calculated_velocities_fps.avg.toFixed(2)} fps`
+                      : '-'
+                  )
+                )
+              )
+            ),
+
+            summary.total_issues > 0 && React.createElement('div', null,
+              React.createElement('h4', { style: { marginBottom: '12px' } }, 'Issues by Category'),
+              Object.entries(issuesByCategory).map(([category, categoryIssues]) => {
+                if (categoryIssues.length === 0) return null;
+                return React.createElement('div', { key: category, style: { marginBottom: '24px' } },
+                  React.createElement('h5', {
+                    style: {
+                      marginBottom: '12px',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: '4px',
+                      textTransform: 'capitalize'
+                    }
+                  }, `${category} (${categoryIssues.length})`),
+                  categoryIssues.map((issue, idx) => renderValidationIssue(issue, `${category}-${idx}`))
+                );
+              })
+            ),
+
+            summary.total_issues === 0 && React.createElement('div', {
+              style: {
+                padding: '32px',
+                textAlign: 'center',
+                color: '#22c55e'
+              }
+            },
+              React.createElement('i', { className: 'fas fa-check-circle', style: { fontSize: '48px', marginBottom: '16px' } }),
+              React.createElement('div', { style: { fontSize: '1.25rem', fontWeight: 600 } }, 'No Issues Found'),
+              React.createElement('div', { style: { color: 'var(--color-text-muted)', marginTop: '8px' } },
+                'All validation checks passed successfully!'
+              )
+            )
+          )
+        );
+      };
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
@@ -220,6 +428,38 @@
                   ? React.createElement('div', { className: 'text-center p-md' }, 'Loading network detail...')
                   : detail && React.createElement('div', { className: 'card-body' },
                       summaryCards.length > 0 && React.createElement('div', { className: 'grid grid-cols-4 gap-md mb-md' }, summaryCards.map(renderSummaryCard)),
+                      React.createElement('div', { className: 'mb-md', style: { display: 'flex', gap: '12px', alignItems: 'center' } },
+                        React.createElement('button', {
+                          className: 'btn btn-primary',
+                          onClick: runValidation,
+                          disabled: validationLoading,
+                          style: { display: 'flex', alignItems: 'center', gap: '8px' }
+                        },
+                          React.createElement('i', { className: `fas fa-${validationLoading ? 'spinner fa-spin' : 'check-circle'}` }),
+                          validationLoading ? 'Validating...' : 'Run Comprehensive Validation'
+                        ),
+                        React.createElement('select', {
+                          value: validationStandards,
+                          onChange: (e) => setValidationStandards(e.target.value),
+                          className: 'input',
+                          style: { maxWidth: '200px' }
+                        },
+                          React.createElement('option', { value: 'default' }, 'Default Standards'),
+                          React.createElement('option', { value: 'strict' }, 'Strict Standards')
+                        ),
+                        validationResult && React.createElement('div', {
+                          style: {
+                            padding: '8px 12px',
+                            borderRadius: '4px',
+                            background: validationResult.is_valid ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: validationResult.is_valid ? '#22c55e' : '#ef4444',
+                            fontWeight: 600
+                          }
+                        },
+                          React.createElement('i', { className: `fas fa-${validationResult.is_valid ? 'check-circle' : 'exclamation-triangle'}`, style: { marginRight: '8px' } }),
+                          validationResult.is_valid ? 'Network Valid' : `${validationResult.summary.errors} Errors, ${validationResult.summary.warnings} Warnings`
+                        )
+                      ),
                       detail.pipes && detail.pipes.length > 0 && React.createElement('div', { className: 'mb-lg' },
                         React.createElement('h3', { style: { marginBottom: '0.5rem' } }, 'Pipes'),
                         React.createElement('div', { className: 'datatable-container' },
@@ -255,12 +495,13 @@
                         React.createElement('ul', { style: { paddingLeft: '18px' } }, detail.notes.map(note => (
                           React.createElement('li', { key: note.note_id, style: { marginBottom: '6px' } },
                             React.createElement('strong', null, note.title),
-                            ` – ${note.text}`
+                            ` ï¿½ ${note.text}`
                           )
                         )))
                       )
                     )
-              )
+              ),
+              showValidation && renderValidationResults()
             )
           )
         )
