@@ -82,6 +82,7 @@ acad-gis/
 - `docs/DEVELOPMENT_ROADMAP.md` - backend-first milestones
 - `docs/CIVIL_TOOLS_PLAN.md` - phased plan for civil-focused tools
 - `docs/PIPE_NETWORK_DEMO.md` - how to run the seeded pipe-network demo & viewer
+- `docs/PIPE_NETWORK_VALIDATION.md` - **NEW** comprehensive validation for pipe networks (continuity, hydraulic, standards, topology)
 
 ## Philosophy
 CAD projects are information, not vendor-bound files. Python + PostGIS + open formats can handle the majority of civil/survey workflows without proprietary software.
