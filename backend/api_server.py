@@ -1497,7 +1497,7 @@ def validate_network_comprehensive(request: ValidationRequest):
         return {
             "success": True,
             "result": result_dict,
-            "message": f"Validated network: {result.summary['total_issues']} issues found ({result.summary['errors']} errors, {result.summary['warnings']} warnings)"
+            "message": f"Validated network: {result_dict['summary']['total_issues']} issues found ({result_dict['summary']['errors']} errors, {result_dict['summary']['warnings']} warnings)"
         }
 
     except Exception as e:
