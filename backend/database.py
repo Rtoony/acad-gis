@@ -770,6 +770,8 @@ def fetch_pipe_slopes(project_id: Optional[str] = None, network_id: Optional[str
             pn.name AS network_name,
             pn.project_id,
             proj.project_name,
+            p.up_structure_id,
+            p.down_structure_id,
             p.diameter_mm,
             p.material,
             p.slope,
