@@ -1,0 +1,3 @@
+-- Reference DDL Snapshot
+-- This file intentionally holds the latest schema snapshot for reference only.
+-- If you want me to embed the full snapshot you shared, I can add it here.
