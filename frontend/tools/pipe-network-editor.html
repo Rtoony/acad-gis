@@ -43,6 +43,7 @@
       const [validationLoading, setValidationLoading] = useState(false);
       const [validationStandards, setValidationStandards] = useState('default');
       const [showValidation, setShowValidation] = useState(false);
+      const [showVisualizer, setShowVisualizer] = useState(false);
 
       const formatPercent = (value) => (value === null || value === undefined) ? '-' : `${(value * 100).toFixed(2)}%`;
       const formatNumber = (value) => (value === null || value === undefined) ? '-' : Number(value).toLocaleString();
@@ -267,6 +268,258 @@
         );
       };
 
+      const renderNetworkVisualizer = () => {
+        if (!detail || !detail.structures || !detail.pipes) return null;
+
+        const structures = detail.structures;
+        const pipes = detail.pipes;
+
+        // Calculate bounds from structure coordinates
+        const lats = structures.filter(s => s.latitude).map(s => s.latitude);
+        const lons = structures.filter(s => s.longitude).map(s => s.longitude);
+
+        if (lats.length === 0 || lons.length === 0) {
+          return React.createElement('div', { className: 'card mt-md' },
+            React.createElement('div', { className: 'card-body text-center p-lg' },
+              'No coordinate data available for visualization'
+            )
+          );
+        }
+
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
+
+        const latRange = maxLat - minLat || 0.001;
+        const lonRange = maxLon - minLon || 0.001;
+        const padding = 50;
+        const svgWidth = 1000;
+        const svgHeight = 600;
+
+        // Scale coordinates to SVG space
+        const toX = (lon) => padding + ((lon - minLon) / lonRange) * (svgWidth - 2 * padding);
+        const toY = (lat) => svgHeight - padding - ((lat - minLat) / latRange) * (svgHeight - 2 * padding);
+
+        // Create structure lookup
+        const structureMap = {};
+        structures.forEach(s => {
+          structureMap[s.structure_id] = s;
+        });
+
+        return React.createElement('div', { className: 'card mt-md' },
+          React.createElement('div', { className: 'card-header' },
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+            },
+              React.createElement('div', { className: 'card-title' }, 'Network Visualizer'),
+              React.createElement('button', {
+                className: 'btn btn-sm',
+                onClick: () => setShowVisualizer(false)
+              }, 'Close')
+            )
+          ),
+          React.createElement('div', { className: 'card-body' },
+            React.createElement('div', {
+              style: {
+                background: '#1e1e1e',
+                borderRadius: '8px',
+                padding: '20px',
+                overflow: 'auto'
+              }
+            },
+              React.createElement('svg', {
+                viewBox: `0 0 ${svgWidth} ${svgHeight}`,
+                style: { width: '100%', height: 'auto', minHeight: '500px' }
+              },
+                // Grid
+                React.createElement('defs', null,
+                  React.createElement('pattern', {
+                    id: 'grid',
+                    width: '50',
+                    height: '50',
+                    patternUnits: 'userSpaceOnUse'
+                  },
+                    React.createElement('path', {
+                      d: 'M 50 0 L 0 0 0 50',
+                      fill: 'none',
+                      stroke: '#333',
+                      strokeWidth: '1'
+                    })
+                  )
+                ),
+                React.createElement('rect', { width: svgWidth, height: svgHeight, fill: 'url(#grid)' }),
+
+                // Pipes
+                pipes.map((pipe, idx) => {
+                  const upStruct = structureMap[pipe.up_structure_id];
+                  const downStruct = structureMap[pipe.down_structure_id];
+
+                  if (!upStruct || !downStruct || !upStruct.latitude || !downStruct.latitude) return null;
+
+                  const x1 = toX(upStruct.longitude);
+                  const y1 = toY(upStruct.latitude);
+                  const x2 = toX(downStruct.longitude);
+                  const y2 = toY(downStruct.latitude);
+                  const midX = (x1 + x2) / 2;
+                  const midY = (y1 + y2) / 2;
+
+                  const diameter = pipe.diameter_mm ? `${Math.round(pipe.diameter_mm)}mm` : '?';
+                  const slope = pipe.slope ? `${(pipe.slope * 100).toFixed(2)}%` : '?';
+                  const length = pipe.length_m ? `${pipe.length_m.toFixed(1)}m` : '?';
+
+                  return React.createElement('g', { key: `pipe-${idx}` },
+                    // Pipe line
+                    React.createElement('line', {
+                      x1, y1, x2, y2,
+                      stroke: '#3b82f6',
+                      strokeWidth: '4',
+                      strokeLinecap: 'round'
+                    }),
+                    // Pipe label background
+                    React.createElement('rect', {
+                      x: midX - 35,
+                      y: midY - 18,
+                      width: '70',
+                      height: '36',
+                      fill: '#1e1e1e',
+                      stroke: '#3b82f6',
+                      strokeWidth: '1',
+                      rx: '4'
+                    }),
+                    // Pipe labels
+                    React.createElement('text', {
+                      x: midX,
+                      y: midY - 4,
+                      fill: '#3b82f6',
+                      fontSize: '10',
+                      fontWeight: '600',
+                      textAnchor: 'middle'
+                    }, diameter),
+                    React.createElement('text', {
+                      x: midX,
+                      y: midY + 8,
+                      fill: '#94a3b8',
+                      fontSize: '8',
+                      textAnchor: 'middle'
+                    }, `L:${length}`),
+                    React.createElement('text', {
+                      x: midX,
+                      y: midY + 18,
+                      fill: '#94a3b8',
+                      fontSize: '8',
+                      textAnchor: 'middle'
+                    }, `S:${slope}`)
+                  );
+                }),
+
+                // Structures
+                structures.filter(s => s.latitude && s.longitude).map((struct, idx) => {
+                  const x = toX(struct.longitude);
+                  const y = toY(struct.latitude);
+                  const label = struct.metadata && struct.metadata.label ? struct.metadata.label : struct.structure_id.slice(0, 8);
+                  const rimElev = struct.rim_elev !== null ? struct.rim_elev.toFixed(2) : '-';
+                  const invertElev = struct.invert_elev !== null ? struct.invert_elev.toFixed(2) : '-';
+
+                  return React.createElement('g', { key: `struct-${idx}` },
+                    // Structure circle
+                    React.createElement('circle', {
+                      cx: x,
+                      cy: y,
+                      r: '12',
+                      fill: '#ef4444',
+                      stroke: '#fff',
+                      strokeWidth: '2'
+                    }),
+                    // Structure type icon
+                    React.createElement('text', {
+                      x,
+                      y: y + 4,
+                      fill: '#fff',
+                      fontSize: '12',
+                      fontWeight: 'bold',
+                      textAnchor: 'middle'
+                    }, struct.type === 'manhole' ? 'MH' : 'IN'),
+                    // Label background
+                    React.createElement('rect', {
+                      x: x - 45,
+                      y: y + 18,
+                      width: '90',
+                      height: '48',
+                      fill: '#1e1e1e',
+                      stroke: '#ef4444',
+                      strokeWidth: '1',
+                      rx: '4'
+                    }),
+                    // Structure labels
+                    React.createElement('text', {
+                      x,
+                      y: y + 30,
+                      fill: '#f87171',
+                      fontSize: '10',
+                      fontWeight: '600',
+                      textAnchor: 'middle'
+                    }, label),
+                    React.createElement('text', {
+                      x,
+                      y: y + 42,
+                      fill: '#94a3b8',
+                      fontSize: '8',
+                      textAnchor: 'middle'
+                    }, `Rim: ${rimElev}`),
+                    React.createElement('text', {
+                      x,
+                      y: y + 54,
+                      fill: '#94a3b8',
+                      fontSize: '8',
+                      textAnchor: 'middle'
+                    }, `Inv: ${invertElev}`)
+                  );
+                })
+              )
+            ),
+            React.createElement('div', {
+              style: {
+                marginTop: '16px',
+                padding: '12px',
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: '4px',
+                display: 'flex',
+                gap: '24px',
+                fontSize: '0.85rem'
+              }
+            },
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                React.createElement('div', {
+                  style: {
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: '#ef4444',
+                    border: '2px solid #fff'
+                  }
+                }),
+                React.createElement('span', null, 'Structures')
+              ),
+              React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                React.createElement('div', {
+                  style: {
+                    width: '24px',
+                    height: '4px',
+                    background: '#3b82f6',
+                    borderRadius: '2px'
+                  }
+                }),
+                React.createElement('span', null, 'Pipes')
+              ),
+              React.createElement('div', { style: { marginLeft: 'auto', color: 'var(--color-text-muted)' } },
+                `${structures.length} structures, ${pipes.length} pipes`
+              )
+            )
+          )
+        );
+      };
+
       const renderValidationResults = () => {
         if (!validationResult) return null;
 
@@ -430,7 +683,7 @@
                   ? React.createElement('div', { className: 'text-center p-md' }, 'Loading network detail...')
                   : detail && React.createElement('div', { className: 'card-body' },
                       summaryCards.length > 0 && React.createElement('div', { className: 'grid grid-cols-4 gap-md mb-md' }, summaryCards.map(renderSummaryCard)),
-                      React.createElement('div', { className: 'mb-md', style: { display: 'flex', gap: '12px', alignItems: 'center' } },
+                      React.createElement('div', { className: 'mb-md', style: { display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' } },
                         React.createElement('button', {
                           className: 'btn btn-primary',
                           onClick: runValidation,
@@ -439,6 +692,14 @@
                         },
                           React.createElement('i', { className: `fas fa-${validationLoading ? 'spinner fa-spin' : 'check-circle'}` }),
                           validationLoading ? 'Validating...' : 'Run Comprehensive Validation'
+                        ),
+                        React.createElement('button', {
+                          className: 'btn btn-secondary',
+                          onClick: () => setShowVisualizer(!showVisualizer),
+                          style: { display: 'flex', alignItems: 'center', gap: '8px' }
+                        },
+                          React.createElement('i', { className: 'fas fa-project-diagram' }),
+                          showVisualizer ? 'Hide Visualizer' : 'Show Network Visualizer'
                         ),
                         React.createElement('select', {
                           value: validationStandards,
@@ -503,6 +764,7 @@
                       )
                     )
               ),
+              showVisualizer && renderNetworkVisualizer(),
               showValidation && renderValidationResults()
             )
           )
