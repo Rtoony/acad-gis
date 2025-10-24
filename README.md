@@ -51,6 +51,20 @@ acad-gis/
 ## New to This Project?
 - Start with the beginner-friendly overview: `docs/BEGINNERS_GUIDE.md`
 
+## Secrets and Environment
+- Do not commit secrets. Keep `backend/.env` local (it is ignored by Git).
+- Follow `docs/DATABASE_CONNECTION.md` for connection details using Supabase Session Pooler.
+- Required vars: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+
+## GIS Processing (Optional)
+- Install QGIS 3.40 LTR (or compatible) on Windows.
+- Install required Python packages into the bundled QGIS interpreter:
+  - `"C:\Program Files\QGIS 3.40.11\bin\python-qgis-ltr.bat" -m pip install uvicorn fastapi "pydantic>=2,<3" "starlette>=0.37,<0.38" python-dotenv psycopg2-binary python-multipart ezdxf`
+- Launch the API with the QGIS-ready helpers:
+  - Windows: `start_qgis_server.bat`
+  - Linux/WSL: `./start_qgis_server.sh`
+- On startup you should see `GIS Processing: ENABLED`. Hit `GET /api/gis/status` to confirm it returns `{ "gis_enabled": true }`.
+
 ## Tools
 - Project Manager: `frontend/tools/project-manager.html:1`
 - Drawing Browser: `frontend/tools/drawing_browser.html:1`

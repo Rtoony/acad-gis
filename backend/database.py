@@ -409,13 +409,14 @@ def list_canonical_features(
 ) -> List[Dict]:
     """
     Return canonical features for a drawing, optionally filtered by bbox and simplified.
+    Adds layer metadata (color, ids) so the map can style features consistently.
     """
     srid = target_srid or 4326
-    geom_expr = "geom"
+    geom_expr = "cf.geom"
     params: List[Any] = []
 
     if srid != 4326:
-        geom_expr = "ST_Transform(geom, %s)"
+        geom_expr = "ST_Transform(cf.geom, %s)"
         params.append(srid)
 
     if simplify_tolerance and simplify_tolerance > 0:
@@ -424,27 +425,40 @@ def list_canonical_features(
 
     query = f"""
         SELECT
-            feature_id,
-            drawing_id,
-            project_id,
-            feature_type,
-            layer_name,
+            cf.feature_id,
+            cf.drawing_id,
+            cf.project_id,
+            cf.feature_type,
+            cf.layer_name,
             ST_AsGeoJSON({geom_expr}) AS geom,
-            metadata
-        FROM canonical_features
-        WHERE drawing_id = %s
-          AND geom IS NOT NULL
+            cf.metadata,
+            l.layer_id,
+            COALESCE(l.layer_standard_id, ls.layer_standard_id) AS layer_standard_id,
+            COALESCE(l.color, ls.color) AS layer_color_index,
+            ls.color_rgb AS layer_color_rgb,
+            COALESCE(ls.color_name, l.metadata ->> 'color_name') AS layer_color_name
+        FROM canonical_features cf
+        LEFT JOIN layers l
+          ON l.drawing_id = cf.drawing_id
+         AND l.layer_name = cf.layer_name
+        LEFT JOIN layer_standards ls
+          ON (
+               (l.layer_standard_id IS NOT NULL AND ls.layer_standard_id = l.layer_standard_id)
+               OR (l.layer_standard_id IS NULL AND ls.layer_name = cf.layer_name)
+             )
+        WHERE cf.drawing_id = %s
+          AND cf.geom IS NOT NULL
     """
     params.append(drawing_id)
 
     if bbox:
         query += """
-          AND geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)
+          AND cf.geom && ST_MakeEnvelope(%s, %s, %s, %s, 4326)
         """
         params.extend(bbox)
 
     query += """
-        ORDER BY feature_type, feature_id
+        ORDER BY cf.layer_name, cf.feature_type, cf.feature_id
     """
 
     if limit:

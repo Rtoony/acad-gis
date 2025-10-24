@@ -394,3 +394,4 @@ Follow the PROJECT_STRUCTURE.md guide and use QUICK_REFERENCE.md as you code.
 **Happy Building! 🚀**
 
 *Foundation built October 19, 2025*
+# NOTE: Archived setup summary — prefer docs/DEVELOPMENT_ENVIRONMENT.md and docs/WSL_SETUP.md.

@@ -66,6 +66,20 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 - `POST /api/export/svg`
 - `POST /api/export/json` | `POST /api/export/csv`
 
+## GIS (Optional)
+- `GET /api/gis/status` - report whether QGIS processing is available
+- `GET /api/gis/algorithms` - list registered processing algorithms (placeholder)
+- `POST /api/gis/buffer`
+- `POST /api/gis/clip`
+- `POST /api/gis/intersection`
+- `POST /api/gis/dissolve`
+- `POST /api/gis/reproject`
+- `POST /api/gis/spatial-join`
+- `POST /api/gis/export/shapefile`
+- `POST /api/gis/export/geojson`
+- `GET /api/gis/jobs` - list submitted GIS jobs (placeholder store)
+- `GET /api/gis/jobs/{job_id}` - fetch a submitted GIS job
+
 ## Notes
 - BBOX parameters should be in `minx,miny,maxx,maxy` with SRID specified; server may simplify geometry by scale.
 

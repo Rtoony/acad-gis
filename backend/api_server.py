@@ -16,6 +16,19 @@ import json
 import sys
 from pathlib import Path
 
+# Ensure project root is importable when running from backend/
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
+
+# GIS extensions (optional)
+try:
+    from gis_api_extensions import router as gis_router, GIS_ENABLED  # type: ignore
+except Exception as exc:  # pragma: no cover - optional dependency
+    GIS_ENABLED = False  # type: ignore
+    gis_router = None  # type: ignore
+    print("⚠️ GIS extensions not available:", exc)
+
 # Support running via `python backend/api_server.py` and as package import.
 if __package__ in (None, ""):
     sys.path.append(str(Path(__file__).resolve().parent))
@@ -40,6 +53,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+if 'gis_router' in globals() and gis_router is not None:
+    app.include_router(gis_router)
+
+
+@app.on_event("startup")
+async def report_gis_status() -> None:
+    """Log GIS availability when the server boots (works with uvicorn CLI)."""
+
+    try:
+        if GIS_ENABLED:
+            print("✅ GIS Processing: ENABLED")
+        else:
+            print("⚠️ GIS Processing: DISABLED")
+    except NameError:
+        print("⚠️ GIS Processing: DISABLED")
 # ============================================
 # PYDANTIC MODELS
 # ============================================
@@ -1320,7 +1348,8 @@ def bmps_geojson(
     bbox: Optional[str] = None,
     srid: Optional[int] = None,
     type: Optional[str] = None,
-    project_id: Optional[str] = None
+    project_id: Optional[str] = None,
+    limit: Optional[int] = None
 ):
     filters = []
     params: List[Any] = []
@@ -1421,9 +1450,16 @@ def clash_detection(scope: Dict[str, Any]):
 # ============================================
 
 if __name__ == "__main__":
-    print("ðŸš€ Starting ACAD=GIS Enhanced API Server...")
-    print("ðŸ“¡ Server running at: http://localhost:8000")
-    print("ðŸ“– API Docs at: http://localhost:8000/docs")
-    print("ðŸ”¥ Press CTRL+C to stop")
+    print("Starting ACAD-GIS Enhanced API Server...")
+    print("Server running at: http://localhost:8000")
+    print("API Docs at: http://localhost:8000/docs")
+    print("Press CTRL+C to stop")
+    try:
+        if GIS_ENABLED:
+            print("✅ GIS Processing: ENABLED")
+        else:
+            print("⚠️ GIS Processing: DISABLED")
+    except NameError:
+        print("⚠️ GIS Processing: DISABLED")
     print("")
     uvicorn.run(app, host="0.0.0.0", port=8000)

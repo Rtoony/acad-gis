@@ -19,6 +19,14 @@
     .statusbar { display:flex; justify-content:space-between; color: var(--color-text-secondary); font-size: 0.85rem; padding-top: 8px; }
     .input, select.input { background: rgba(15,23,42,0.8); color: #e0e7ff; border: 1px solid rgba(59,130,246,0.35); padding: 6px 10px; border-radius: 8px; }
     .sep { width:1px; height:24px; background: rgba(59,130,246,0.35); }
+    .map-wrapper { position: relative; }
+    .map-legend { position: absolute; bottom: 16px; right: 16px; background: rgba(15,23,42,0.88); padding: 12px 14px; border-radius: 12px; box-shadow: 0 12px 24px rgba(15,23,42,0.55); color: #e0e7ff; max-width: 220px; min-width: 180px; z-index: 500; font-size: 0.9rem; pointer-events: auto; }
+    .map-legend h4 { margin: 0 0 8px; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: rgba(226,232,240,0.92); }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-swatch { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(226,232,240,0.35); box-shadow: inset 0 0 4px rgba(15,23,42,0.45); }
+    .legend-label { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .legend-muted { color: rgba(148,163,184,0.85); font-size: 0.78rem; letter-spacing: 0.01em; }
   </style>
 </head>
 <body class="grid-background">
@@ -48,6 +56,130 @@
       label: { color: '#f97316', radius: 5 }
     };
 
+    const DEFAULT_COLOR = '#22d3ee';
+    const DEFAULT_FILL_ALPHA = 0.18;
+    const ACI_COLORS = {
+      1: '#ff0000',
+      2: '#ffff00',
+      3: '#00ff00',
+      4: '#00ffff',
+      5: '#0000ff',
+      6: '#ff00ff',
+      7: '#f8fafc',
+      8: '#808080',
+      9: '#c0c0c0'
+    };
+    const COLOR_NAME_MAP = {
+      'red': '#ef4444',
+      'yellow': '#facc15',
+      'green': '#22c55e',
+      'cyan': '#14b8a6',
+      'blue': '#3b82f6',
+      'magenta': '#d946ef',
+      'purple': '#8b5cf6',
+      'white': '#f8fafc',
+      'black': '#1e293b',
+      'gray': '#94a3b8',
+      'grey': '#94a3b8',
+      'light gray': '#cbd5f5',
+      'light grey': '#cbd5f5',
+      'dark gray': '#475569',
+      'dark grey': '#475569',
+      'orange': '#fb923c'
+    };
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    function componentToHex(value) {
+      return clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0');
+    }
+
+    function rgbStringToHex(str) {
+      if (!str || typeof str !== 'string') return null;
+      const trimmed = str.trim();
+      if (trimmed.startsWith('#') && (trimmed.length === 7 || trimmed.length === 4)) {
+        return trimmed.length === 4
+          ? '#' + trimmed.slice(1).split('').map(ch => ch + ch).join('')
+          : trimmed;
+      }
+      const parts = trimmed.split(/[^0-9]+/).filter(Boolean).slice(0, 3).map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return null;
+      const [r, g, b] = parts.map(v => clamp(v, 0, 255));
+      return `#${componentToHex(r)}${componentToHex(g)}${componentToHex(b)}`;
+    }
+
+    function aciToHex(index) {
+      const idx = Number(index);
+      if (!Number.isFinite(idx)) return null;
+      if (ACI_COLORS[idx]) return ACI_COLORS[idx];
+      const r = (37 * idx + 73) % 256;
+      const g = (17 * idx + 199) % 256;
+      const b = (97 * idx + 151) % 256;
+      return `#${componentToHex(r)}${componentToHex(g)}${componentToHex(b)}`;
+    }
+
+    function hexToRgb(hex) {
+      if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return null;
+      const clean = hex.replace('#', '');
+      if (clean.length !== 6) return null;
+      const intVal = parseInt(clean, 16);
+      return {
+        r: (intVal >> 16) & 255,
+        g: (intVal >> 8) & 255,
+        b: intVal & 255
+      };
+    }
+
+    function hexToRgba(hex, alpha = DEFAULT_FILL_ALPHA) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) return `rgba(34,211,238,${alpha})`;
+      return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+    }
+
+    function ensureVisibleStroke(hex) {
+      const rgb = hexToRgb(hex);
+      if (!rgb) return hex || DEFAULT_COLOR;
+      const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+      if (luminance > 0.85) {
+        return '#64748b';
+      }
+      return hex;
+    }
+
+    const Legend = ({ items }) => {
+      if (!items || !items.length) return null;
+      return React.createElement(
+        'div',
+        { className: 'map-legend' },
+        [
+          React.createElement('h4', { key: 'legend-title' }, 'Legend'),
+          ...items.map(item =>
+            React.createElement(
+              'div',
+              { className: 'legend-item', key: item.key || item.label },
+              [
+                React.createElement('span', {
+                  key: 'swatch',
+                  className: 'legend-swatch',
+                  style: { background: item.fill, borderColor: item.stroke }
+                }),
+                React.createElement(
+                  'div',
+                  { key: 'label', className: 'legend-label' },
+                  [
+                    React.createElement('div', { key: 'label-line' }, item.label),
+                    item.subtitle
+                      ? React.createElement('div', { key: 'sub', className: 'legend-muted' }, item.subtitle)
+                      : null
+                  ]
+                )
+              ]
+            )
+          )
+        ]
+      );
+    };
+
     function MapViewer() {
       const mapRef = useRef(null);
       const mapEl = useRef(null);
@@ -60,33 +192,79 @@
       const [zoom, setZoom] = useState(12);
       const [featureSummary, setFeatureSummary] = useState({ count: 0, source: null });
       const [loadingGeojson, setLoadingGeojson] = useState(false);
+      const [legendItems, setLegendItems] = useState([]);
       const apiClient = window.API || { list: async () => [], request: async () => ({}) };
       const locate = useRef({ marker: null, circle: null });
       const featureLayer = useRef(null);
+
+      const resolveLayerColors = useCallback((props = {}) => {
+        const rgbHex = rgbStringToHex(props.layer_color_rgb);
+        const colorName = typeof props.layer_color_name === 'string'
+          ? COLOR_NAME_MAP[props.layer_color_name.toLowerCase()]
+          : null;
+        let idxValue = null;
+        if (props.layer_color_index !== undefined && props.layer_color_index !== null && props.layer_color_index !== '') {
+          const parsed = Number(props.layer_color_index);
+          idxValue = Number.isFinite(parsed) ? parsed : null;
+        }
+
+        let stroke = rgbHex || (idxValue !== null ? aciToHex(idxValue) : null) || colorName || DEFAULT_COLOR;
+        stroke = ensureVisibleStroke(stroke);
+        const fill = hexToRgba(stroke, DEFAULT_FILL_ALPHA);
+        const label = props.layer_name || props.feature_type || 'Layer';
+        const subtitle = props.layer_color_name
+          ? props.layer_color_name
+          : (idxValue !== null ? `ACI ${idxValue}` : null);
+
+        return { stroke, fill, label, subtitle };
+      }, []);
 
       useEffect(() => {
         if (mapRef.current) return; // already init
 
         // Basemaps
         const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 20, attribution: '&copy; OpenStreetMap'
+          maxZoom: 23, attribution: '&copy; OpenStreetMap'
         });
         const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          maxZoom: 20, attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+          maxZoom: 23, attribution: '&copy; Esri, Maxar, Earthstar Geographics'
         });
         const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 20, attribution: '&copy; CARTO'
+          maxZoom: 23, attribution: '&copy; CARTO'
         });
+        const parcels = L.tileLayer.wms(
+          'https://gis.sonomacounty.org/arcgis/services/BaseMaps/Parcels/MapServer/WMSServer',
+          {
+            layers: '0',
+            format: 'image/png',
+            transparent: true,
+            opacity: 0.55,
+            attribution: 'Sonoma County GIS'
+          }
+        );
+        const baseLayers = {
+          'OSM': osm,
+          'Esri Imagery': esri,
+          'CARTO Voyager': carto
+        };
+        const overlayLayers = {
+          'Parcels (Sonoma County)': parcels
+        };
 
         const map = L.map(mapEl.current, {
           center: [38.4405, -122.7144], // Santa Rosa, CA default
           zoom: 12,
           zoomControl: false,
-          layers: [osm]
+          layers: [osm],
+          zoomSnap: 0.25,
+          zoomDelta: 0.25,
+          wheelPxPerZoomLevel: 90
         });
+        map.setMinZoom(8);
+        map.setMaxZoom(23);
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.scale().addTo(map);
-        L.control.layers({ 'OSM': osm, 'Esri Imagery': esri, 'CARTO Voyager': carto }, {}, { position: 'topright' }).addTo(map);
+        L.control.layers(baseLayers, overlayLayers, { position: 'topright', collapsed: true }).addTo(map);
 
         mapRef.current = map;
         map.on('mousemove', (e) => setMousePos({ lat: e.latlng.lat, lng: e.latlng.lng }));
@@ -122,6 +300,7 @@
             map.removeLayer(featureLayer.current);
             featureLayer.current = null;
           }
+          setLegendItems([]);
         };
 
         if (!drawingId) {
@@ -170,6 +349,25 @@
               if (layerBounds && layerBounds.isValid()) {
                 map.fitBounds(layerBounds.pad(0.05), { padding: [20, 20] });
               }
+
+              const legendMap = new Map();
+              geo.features.forEach((feature) => {
+                const props = feature?.properties || {};
+                const colors = resolveLayerColors(props);
+                const key = props.layer_name || props.feature_type || `layer-${legendMap.size}`;
+                if (!legendMap.has(key)) {
+                  legendMap.set(key, {
+                    key,
+                    label: colors.label,
+                    subtitle: colors.subtitle,
+                    stroke: colors.stroke,
+                    fill: colors.fill
+                  });
+                }
+              });
+              setLegendItems(Array.from(legendMap.values()));
+            } else {
+              setLegendItems([]);
             }
 
             setFeatureSummary({
@@ -189,7 +387,7 @@
         })();
 
         return () => { cancelled = true; };
-      }, [drawingId, apiClient, geoJsonOnEach, geoJsonPoint, geoJsonStyle]);
+      }, [drawingId, apiClient, geoJsonOnEach, geoJsonPoint, geoJsonStyle, resolveLayerColors]);
 
       function transformToLatLng([x, y], fromEpsg) {
         try {
@@ -211,33 +409,45 @@
       }
 
       const geoJsonStyle = useCallback((feature) => {
-        const type = feature?.properties?.feature_type || 'line';
-        const style = FEATURE_STYLE[type] || FEATURE_STYLE.line;
+        const props = feature?.properties || {};
+        const colors = resolveLayerColors(props);
+        const geomType = (feature?.geometry?.type || '').toLowerCase();
+        const base =
+          geomType.includes('polygon') ? FEATURE_STYLE.polygon :
+          geomType.includes('line') ? FEATURE_STYLE.line :
+          FEATURE_STYLE.line;
         return {
-          color: style.color,
-          weight: style.weight || 2,
-          fillColor: style.fillColor || style.color,
-          fillOpacity: style.fillOpacity ?? 0.1
+          color: colors.stroke,
+          weight: base.weight || 2,
+          opacity: base.opacity ?? 1,
+          fillColor: colors.fill,
+          fillOpacity: base.fillOpacity ?? (geomType.includes('polygon') ? DEFAULT_FILL_ALPHA : 0)
         };
-      }, []);
+      }, [resolveLayerColors]);
 
       const geoJsonPoint = useCallback((feature, latlng) => {
-        const type = feature?.properties?.feature_type || 'point';
-        const style = FEATURE_STYLE[type] || FEATURE_STYLE.point;
+        const props = feature?.properties || {};
+        const colors = resolveLayerColors(props);
+        const style = FEATURE_STYLE.point;
         return L.circleMarker(latlng, {
           radius: style.radius || 4,
-          color: style.color,
-          fillColor: style.fillColor || style.color,
-          fillOpacity: style.fillOpacity ?? 0.85,
+          color: colors.stroke,
+          fillColor: colors.fill,
+          fillOpacity: 0.9,
           weight: 1
         });
-      }, []);
+      }, [resolveLayerColors]);
 
       const geoJsonOnEach = useCallback((feature, layer) => {
         const props = feature?.properties || {};
         const lines = [];
         if (props.layer_name) lines.push(`<strong>${props.layer_name}</strong>`);
         if (props.feature_type) lines.push(`Type: ${props.feature_type}`);
+        if (props.layer_color_name) {
+          lines.push(`Color: ${props.layer_color_name}`);
+        } else if (props.layer_color_index !== undefined && props.layer_color_index !== null) {
+          lines.push(`Color index: ${props.layer_color_index}`);
+        }
         if (props.metadata?.block_name) lines.push(`Block: ${props.metadata.block_name}`);
         if (props.metadata?.text) lines.push(props.metadata.text);
         if (lines.length) layer.bindPopup(lines.join('<br/>'));
@@ -281,12 +491,17 @@
               ),
               React.createElement('div', { className: 'card' },
                 React.createElement('div', { className: 'card-body' },
-                  React.createElement('div', { id: 'map', ref: mapEl })
+                  React.createElement('div', { className: 'map-wrapper' },
+                    React.createElement('div', { id: 'map', ref: mapEl }),
+                    legendItems.length
+                      ? React.createElement(Legend, { items: legendItems })
+                      : null
+                  )
                 ),
                 React.createElement('div', { className: 'card-footer' },
                   React.createElement('div', { className: 'statusbar' },
                     React.createElement('div', null, `Lat: ${mousePos.lat.toFixed(6)}  Lng: ${mousePos.lng.toFixed(6)}`),
-                    React.createElement('div', null, `Zoom: ${zoom}`),
+                    React.createElement('div', null, `Zoom: ${zoom.toFixed ? zoom.toFixed(2) : zoom}`),
                     React.createElement('div', null,
                       loadingGeojson
                         ? 'Features: loading…'

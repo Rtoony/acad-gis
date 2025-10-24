@@ -71,7 +71,7 @@ DB_HOST=aws-1-us-east-2.pooler.supabase.com
 DB_PORT=5432
 DB_NAME=postgres
 DB_USER=postgres.dkvyhbqmeumanhnhxmxf
-DB_PASSWORD=FFj9aBq8PtYNPaiz
+DB_PASSWORD=<your-password>
 
 OPENAI_API_KEY=sk-proj-...
 ```

@@ -439,3 +439,4 @@ Build your first tool using the foundation!
 **License:** Internal Use
 
 **🚀 Foundation Complete - Ready to Build! 🚀**
+# NOTE: Archived legacy manifest — superseded by current README and docs/DEVELOPMENT_ROADMAP.md.

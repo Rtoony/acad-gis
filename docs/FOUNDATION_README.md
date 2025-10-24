@@ -422,3 +422,4 @@ Built with:
 ---
 
 **ACAD=GIS © 2025** • Built for efficient CAD data management and GIS visualization
+# NOTE: Archived legacy overview — use README.md and docs/PROJECT_STRUCTURE.md for the current setup.

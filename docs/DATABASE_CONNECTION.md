@@ -76,10 +76,10 @@ Host:     aws-1-us-east-2.pooler.supabase.com
 Port:     5432
 Database: postgres
 User:     postgres.dkvyhbqmeumanhnhxmxf
-Password: FFj9aBq8PtYNPaiz
+Password: <your-password>
 
 # Full connection string
-postgresql://postgres.dkvyhbqmeumanhnhxmxf:FFj9aBq8PtYNPaiz@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+postgresql://postgres.dkvyhbqmeumanhnhxmxf:<your-password>@aws-1-us-east-2.pooler.supabase.com:5432/postgres
 ```
 
 ---
@@ -134,7 +134,7 @@ FATAL: password authentication failed for user "postgres"
 3. Typo in password
 
 **Solution:**
-Use the password from your working setup: `FFj9aBq8PtYNPaiz`
+Use the password from your working setup (replace `<your-password>` accordingly).
 
 **If forgotten:**
 1. Supabase Dashboard → Project Settings → Database
@@ -167,11 +167,11 @@ Use the password from your working setup: `FFj9aBq8PtYNPaiz`
 DB_HOST=aws-1-us-east-2.pooler.supabase.com
 DB_NAME=postgres
 DB_USER=postgres.dkvyhbqmeumanhnhxmxf
-DB_PASSWORD=FFj9aBq8PtYNPaiz
+DB_PASSWORD=<your-password>
 DB_PORT=5432
 
 # Full Connection String
-DATABASE_URL=postgresql://postgres.dkvyhbqmeumanhnhxmxf:FFj9aBq8PtYNPaiz@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.dkvyhbqmeumanhnhxmxf:<your-password>@aws-1-us-east-2.pooler.supabase.com:5432/postgres
 
 # ============================================
 # Supabase API Configuration
@@ -203,7 +203,7 @@ config = {
     'host': 'aws-1-us-east-2.pooler.supabase.com',
     'database': 'postgres',
     'user': 'postgres.dkvyhbqmeumanhnhxmxf',
-    'password': 'FFj9aBq8PtYNPaiz',
+    'password': os.getenv('DB_PASSWORD'),
     'port': '5432'
 }
 

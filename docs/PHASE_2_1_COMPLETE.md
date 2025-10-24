@@ -395,3 +395,4 @@ Phase 2.1 is complete when:
 **Phase 2.1 Complete!** 🎊  
 **Date:** October 19, 2025  
 **Status:** Ready for integration into tools
+# NOTE: Archived phase summary — replaced by docs/COMPONENT_LIBRARY.md and the tools under frontend/tools/.

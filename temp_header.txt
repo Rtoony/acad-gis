@@ -1,0 +1,40 @@
+"""
+ACAD=GIS Enhanced FastAPI Server
+Adds CRUD operations, file upload, and export functionality
+"""
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
+import uvicorn
+import os
+import tempfile
+from datetime import datetime
+import json
+import sys
+from pathlib import Path
+
+# Support running via `python backend/api_server.py` and as package import.
+if __package__ in (None, ""):
+    sys.path.append(str(Path(__file__).resolve().parent))
+    import database  # type: ignore
+    from import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+else:
+    from . import database  # type: ignore
+    from .import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+
+app = FastAPI(
+    title="ACAD=GIS Enhanced API",
+    description="REST API with full CRUD operations",
+    version="2.0.0"
+)
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],

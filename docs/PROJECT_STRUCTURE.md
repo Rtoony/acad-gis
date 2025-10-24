@@ -4,6 +4,10 @@
 ```
 acad-gis/
   tool_launcher.html
+  gis_api_extensions.py
+  gis_processor.py
+  start_qgis_server.bat
+  start_qgis_server.sh
   backend/
   frontend/
     shared/
@@ -25,12 +29,13 @@ acad-gis/
 - `project-manager.html`, `drawing_browser.html`, `drawing-importer.html`, `map_viewer.html`
 
 ## Backend
-- `backend/api_server.py` — FastAPI app and endpoints
-- `backend/database.py` — DB helpers
+- `backend/api_server.py` - FastAPI app and endpoints
+- `backend/database.py` - DB helpers
+- `gis_api_extensions.py` / `gis_processor.py` - optional GIS router and helpers (auto-imported when present)
 - Import scripts and tests under `backend/`
 
 ## Prototypes
-`prototypes/joshycad/` — Python DXF generators and helpers (proofs of concept):
+`prototypes/joshycad/` - Python DXF generators and helpers (proofs of concept):
 - `cad_generator.py`, `subdivision.py`, `grading_3d.py`, `block_library.py`, etc.
 
 ## Docs
@@ -43,4 +48,3 @@ Key references:
 
 ## Notes
 - The UI is intentionally thin and demo-oriented; the core focus is the database + Python DXF tooling.
-

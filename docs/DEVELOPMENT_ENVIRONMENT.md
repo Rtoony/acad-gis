@@ -175,11 +175,11 @@ postgresql://postgres.dkvyhbqmeumanhnhxmxf:[PASSWORD]@aws-1-us-east-2.pooler.sup
 DB_HOST=aws-1-us-east-2.pooler.supabase.com
 DB_NAME=postgres
 DB_USER=postgres.dkvyhbqmeumanhnhxmxf
-DB_PASSWORD=FFj9aBq8PtYNPaiz
+DB_PASSWORD=<your-password>
 DB_PORT=5432
 
 # Full connection string
-DATABASE_URL=postgresql://postgres.dkvyhbqmeumanhnhxmxf:FFj9aBq8PtYNPaiz@aws-1-us-east-2.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://postgres.dkvyhbqmeumanhnhxmxf:<your-password>@aws-1-us-east-2.pooler.supabase.com:5432/postgres
 
 # Supabase API settings
 SUPABASE_URL=https://dkvyhbqmeumanhnhxmxf.supabase.co
@@ -405,6 +405,7 @@ cd ~/projects/acad-gis
 source venv/bin/activate
 
 python3 << 'EOF'
+import os
 import psycopg2
 
 try:
@@ -412,7 +413,7 @@ try:
         host='aws-1-us-east-2.pooler.supabase.com',
         database='postgres',
         user='postgres.dkvyhbqmeumanhnhxmxf',
-        password='FFj9aBq8PtYNPaiz',
+        password=os.getenv('DB_PASSWORD'),
         port='5432'
     )
     
@@ -424,3 +425,18 @@ try:
     conn.close()
 except Exception as e:
     print(f"❌ Error: {e}")
+EOF
+```
+
+### Optional: Enable QGIS-backed GIS Endpoints (Windows)
+```bash
+"C:\Program Files\QGIS 3.40.11\bin\python-qgis-ltr.bat" -m pip install ^
+    uvicorn fastapi "pydantic>=2,<3" "starlette>=0.37,<0.38" ^
+    python-dotenv psycopg2-binary python-multipart ezdxf
+
+H:\\acad-gis\\start_qgis_server.bat
+# or on WSL/Linux
+./start_qgis_server.sh
+```
+- Expect "GIS Processing: ENABLED" in the console.
+- Verify via `GET /api/gis/status` -> `{ "gis_enabled": true }`.
