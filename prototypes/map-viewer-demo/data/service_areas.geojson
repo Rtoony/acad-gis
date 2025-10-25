@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-001",
+        "name": "Primary Service Area",
+        "type": "primary",
+        "description": "Main service coverage area - San Francisco",
+        "population": "870,000",
+        "established": "2010"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.5150, 37.8100],
+          [-122.5150, 37.7050],
+          [-122.3550, 37.7050],
+          [-122.3550, 37.8100],
+          [-122.5150, 37.8100]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-002",
+        "name": "East Bay Expansion Area",
+        "type": "expansion",
+        "description": "Planned expansion - Oakland and surrounding areas",
+        "population": "450,000",
+        "established": "2022"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.3550, 37.8500],
+          [-122.3550, 37.7500],
+          [-122.1500, 37.7500],
+          [-122.1500, 37.8500],
+          [-122.3550, 37.8500]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-003",
+        "name": "Peninsula Service Zone",
+        "type": "secondary",
+        "description": "Secondary service area - Northern Peninsula",
+        "population": "320,000",
+        "established": "2018"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.5000, 37.7050],
+          [-122.5000, 37.5500],
+          [-122.2500, 37.5500],
+          [-122.2500, 37.7050],
+          [-122.5000, 37.7050]
+        ]]
+      }
+    }
+  ]
+}

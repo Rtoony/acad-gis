@@ -1,0 +1,185 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-001",
+        "name": "Market Street Transit Corridor",
+        "type": "transportation",
+        "infrastructure_type": "rail",
+        "status": "operational",
+        "length": "5.2 miles",
+        "capacity": "50,000 passengers/day",
+        "year_built": "2018"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.4194, 37.7749],
+          [-122.4083, 37.7858],
+          [-122.3988, 37.7920],
+          [-122.3891, 37.7989]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-002",
+        "name": "Bay Area Water Main - North",
+        "type": "utilities",
+        "infrastructure_type": "water",
+        "status": "operational",
+        "length": "8.7 miles",
+        "capacity": "50 MGD",
+        "year_built": "2015"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.4194, 37.8099],
+          [-122.4283, 37.7999],
+          [-122.4394, 37.7919],
+          [-122.4483, 37.7849]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-003",
+        "name": "Peninsula Power Transmission Line",
+        "type": "utilities",
+        "infrastructure_type": "electric",
+        "status": "operational",
+        "length": "12.3 miles",
+        "capacity": "230 kV",
+        "year_built": "2016"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.4194, 37.7749],
+          [-122.4094, 37.7649],
+          [-122.3994, 37.7549],
+          [-122.3894, 37.7449],
+          [-122.3794, 37.7349]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-004",
+        "name": "Golden Gate Park Pathway Network",
+        "type": "transportation",
+        "infrastructure_type": "pedestrian",
+        "status": "operational",
+        "length": "6.8 miles",
+        "capacity": "Unlimited",
+        "year_built": "2019"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.5108, 37.7694],
+          [-122.4908, 37.7694],
+          [-122.4708, 37.7694],
+          [-122.4508, 37.7694]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-005",
+        "name": "Embarcadero Waterfront Route",
+        "type": "transportation",
+        "infrastructure_type": "multimodal",
+        "status": "operational",
+        "length": "4.5 miles",
+        "capacity": "Mixed use",
+        "year_built": "2020"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.3933, 37.8080],
+          [-122.3933, 37.8000],
+          [-122.3933, 37.7920],
+          [-122.3933, 37.7840],
+          [-122.3933, 37.7760]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-006",
+        "name": "Sunset Stormwater Collection System",
+        "type": "utilities",
+        "infrastructure_type": "stormwater",
+        "status": "operational",
+        "length": "7.2 miles",
+        "capacity": "100 MGD",
+        "year_built": "2017"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.5108, 37.7594],
+          [-122.4908, 37.7594],
+          [-122.4708, 37.7594],
+          [-122.4508, 37.7594],
+          [-122.4308, 37.7594]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-007",
+        "name": "Mission Bay Fiber Optic Network",
+        "type": "utilities",
+        "infrastructure_type": "telecommunications",
+        "status": "operational",
+        "length": "3.8 miles",
+        "capacity": "100 Gbps",
+        "year_built": "2021"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.3892, 37.7699],
+          [-122.3992, 37.7699],
+          [-122.4092, 37.7699],
+          [-122.4192, 37.7699]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-008",
+        "name": "19th Avenue Rapid Transit",
+        "type": "transportation",
+        "infrastructure_type": "bus_rapid_transit",
+        "status": "operational",
+        "length": "9.1 miles",
+        "capacity": "35,000 passengers/day",
+        "year_built": "2019"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-122.4758, 37.8099],
+          [-122.4758, 37.7899],
+          [-122.4758, 37.7699],
+          [-122.4758, 37.7499],
+          [-122.4758, 37.7299]
+        ]
+      }
+    }
+  ]
+}

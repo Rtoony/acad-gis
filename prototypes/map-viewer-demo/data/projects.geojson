@@ -1,0 +1,290 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-001",
+        "name": "Golden Gate Bridge Retrofit",
+        "year": 2023,
+        "type": "infrastructure",
+        "cost": "$2.5M",
+        "status": "Completed",
+        "description": "Seismic retrofitting of historic bridge structure",
+        "client": "City Engineering Department",
+        "duration": "18 months",
+        "team_size": 12
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4783, 37.8199]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-002",
+        "name": "Downtown Transit Center",
+        "year": 2023,
+        "type": "transportation",
+        "cost": "$8.2M",
+        "status": "Completed",
+        "description": "Multi-modal transportation hub with integrated bus and rail services",
+        "client": "Regional Transit Authority",
+        "duration": "24 months",
+        "team_size": 25
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4194, 37.7749]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-003",
+        "name": "Mission Bay Water Treatment Facility",
+        "year": 2022,
+        "type": "utilities",
+        "cost": "$5.8M",
+        "status": "Completed",
+        "description": "State-of-the-art water treatment and distribution facility",
+        "client": "Public Utilities Commission",
+        "duration": "20 months",
+        "team_size": 18
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3892, 37.7699]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-004",
+        "name": "Pacific Heights Residential Complex",
+        "year": 2023,
+        "type": "residential",
+        "cost": "$12.5M",
+        "status": "Completed",
+        "description": "Luxury residential development with sustainable design features",
+        "client": "Pacific Development Group",
+        "duration": "30 months",
+        "team_size": 20
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4394, 37.7919]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-005",
+        "name": "Embarcadero Commercial Plaza",
+        "year": 2022,
+        "type": "commercial",
+        "cost": "$18.7M",
+        "status": "Completed",
+        "description": "Mixed-use commercial and retail space along waterfront",
+        "client": "Waterfront Development LLC",
+        "duration": "36 months",
+        "team_size": 32
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3933, 37.7955]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-006",
+        "name": "Golden Gate Park Restoration",
+        "year": 2021,
+        "type": "environmental",
+        "cost": "$3.2M",
+        "status": "Completed",
+        "description": "Ecological restoration and habitat enhancement project",
+        "client": "Parks and Recreation Department",
+        "duration": "15 months",
+        "team_size": 10
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4862, 37.7694]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-007",
+        "name": "North Beach Parking Structure",
+        "year": 2022,
+        "type": "infrastructure",
+        "cost": "$6.4M",
+        "status": "Completed",
+        "description": "Six-story underground parking facility with EV charging stations",
+        "client": "City Parking Authority",
+        "duration": "22 months",
+        "team_size": 16
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4103, 37.8006]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-008",
+        "name": "Sunset District Stormwater Management",
+        "year": 2023,
+        "type": "utilities",
+        "cost": "$4.1M",
+        "status": "Completed",
+        "description": "Green infrastructure for stormwater capture and treatment",
+        "client": "Department of Public Works",
+        "duration": "16 months",
+        "team_size": 14
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4969, 37.7562]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-009",
+        "name": "Fisherman's Wharf Pier Renovation",
+        "year": 2021,
+        "type": "infrastructure",
+        "cost": "$9.8M",
+        "status": "Completed",
+        "description": "Structural rehabilitation of historic waterfront piers",
+        "client": "Port Authority",
+        "duration": "28 months",
+        "team_size": 22
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4177, 37.8080]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-010",
+        "name": "SoMa Tech Campus",
+        "year": 2023,
+        "type": "commercial",
+        "cost": "$45.2M",
+        "status": "Completed",
+        "description": "Modern office campus for technology companies",
+        "client": "TechSpace Ventures",
+        "duration": "42 months",
+        "team_size": 48
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3988, 37.7799]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-011",
+        "name": "Presidio Bike Trail Network",
+        "year": 2022,
+        "type": "transportation",
+        "cost": "$2.8M",
+        "status": "Completed",
+        "description": "Multi-use trail system connecting parks and neighborhoods",
+        "client": "Presidio Trust",
+        "duration": "12 months",
+        "team_size": 8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4662, 37.7989]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-012",
+        "name": "Richmond District Housing",
+        "year": 2021,
+        "type": "residential",
+        "cost": "$8.9M",
+        "status": "Completed",
+        "description": "Affordable housing development with community amenities",
+        "client": "Housing Authority",
+        "duration": "26 months",
+        "team_size": 19
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4786, 37.7799]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-013",
+        "name": "Bay Bridge LED Lighting System",
+        "year": 2023,
+        "type": "infrastructure",
+        "cost": "$1.9M",
+        "status": "Completed",
+        "description": "Energy-efficient architectural lighting installation",
+        "client": "Bay Area Transit Authority",
+        "duration": "10 months",
+        "team_size": 12
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.3778, 37.7983]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-014",
+        "name": "Crissy Field Wetland Restoration",
+        "year": 2022,
+        "type": "environmental",
+        "cost": "$4.6M",
+        "status": "Completed",
+        "description": "Coastal wetland habitat restoration and protection",
+        "client": "National Park Service",
+        "duration": "18 months",
+        "team_size": 11
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4672, 37.8052]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "PRJ-015",
+        "name": "Marina District Seismic Upgrade",
+        "year": 2023,
+        "type": "infrastructure",
+        "cost": "$7.3M",
+        "status": "Completed",
+        "description": "Seismic retrofitting of residential buildings",
+        "client": "Neighborhood Association",
+        "duration": "20 months",
+        "team_size": 15
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4386, 37.8044]
+      }
+    }
+  ]
+}
