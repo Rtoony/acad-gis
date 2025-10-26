@@ -7,61 +7,112 @@
         "id": "SA-001",
         "name": "Primary Service Area",
         "type": "primary",
-        "description": "Main service coverage area - San Francisco",
-        "population": "870,000",
+        "description": "Main service coverage area - Sonoma County",
+        "population": "500,000",
         "established": "2010"
       },
       "geometry": {
         "type": "Polygon",
-        "coordinates": [[
-          [-122.5150, 37.8100],
-          [-122.5150, 37.7050],
-          [-122.3550, 37.7050],
-          [-122.3550, 37.8100],
-          [-122.5150, 37.8100]
-        ]]
+        "coordinates": [
+          [
+            [
+              -122.515,
+              37.81
+            ],
+            [
+              -122.515,
+              37.705
+            ],
+            [
+              -122.355,
+              37.705
+            ],
+            [
+              -122.355,
+              37.81
+            ],
+            [
+              -122.515,
+              37.81
+            ]
+          ]
+        ]
       }
     },
     {
       "type": "Feature",
       "properties": {
         "id": "SA-002",
-        "name": "East Bay Expansion Area",
+        "name": "North County Expansion Area",
         "type": "expansion",
-        "description": "Planned expansion - Oakland and surrounding areas",
-        "population": "450,000",
+        "description": "Planned expansion - Healdsburg and surrounding areas",
+        "population": "150,000",
         "established": "2022"
       },
       "geometry": {
         "type": "Polygon",
-        "coordinates": [[
-          [-122.3550, 37.8500],
-          [-122.3550, 37.7500],
-          [-122.1500, 37.7500],
-          [-122.1500, 37.8500],
-          [-122.3550, 37.8500]
-        ]]
+        "coordinates": [
+          [
+            [
+              -122.355,
+              37.85
+            ],
+            [
+              -122.355,
+              37.75
+            ],
+            [
+              -122.15,
+              37.75
+            ],
+            [
+              -122.15,
+              37.85
+            ],
+            [
+              -122.355,
+              37.85
+            ]
+          ]
+        ]
       }
     },
     {
       "type": "Feature",
       "properties": {
         "id": "SA-003",
-        "name": "Peninsula Service Zone",
+        "name": "South County Service Zone",
         "type": "secondary",
-        "description": "Secondary service area - Northern Peninsula",
-        "population": "320,000",
+        "description": "Secondary service area - Petaluma and Novato",
+        "population": "180,000",
         "established": "2018"
       },
       "geometry": {
         "type": "Polygon",
-        "coordinates": [[
-          [-122.5000, 37.7050],
-          [-122.5000, 37.5500],
-          [-122.2500, 37.5500],
-          [-122.2500, 37.7050],
-          [-122.5000, 37.7050]
-        ]]
+        "coordinates": [
+          [
+            [
+              -122.5,
+              37.705
+            ],
+            [
+              -122.5,
+              37.55
+            ],
+            [
+              -122.25,
+              37.55
+            ],
+            [
+              -122.25,
+              37.705
+            ],
+            [
+              -122.5,
+              37.705
+            ]
+          ]
+        ]
       }
     }
   ]

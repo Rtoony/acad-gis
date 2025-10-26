@@ -1,9 +1,9 @@
 {
   "company_name": "Engineering Solutions Inc.",
-  "map_center": [37.7749, -122.4194],
+  "map_center": [38.5, -122.8],
   "initial_zoom": 10,
   "min_zoom": 3,
-  "max_zoom": 18,
+  "max_zoom": 20,
   "default_basemap": "osm",
   "basemaps": {
     "osm": {
@@ -35,6 +35,36 @@
       "name": "Dark",
       "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
       "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "streets": {
+      "name": "Streets",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, DeLorme, NAVTEQ"
+    },
+    "toner": {
+      "name": "Toner (High Contrast)",
+      "url": "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png",
+      "attribution": "Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL"
+    },
+    "watercolor": {
+      "name": "Watercolor (Artistic)",
+      "url": "https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg",
+      "attribution": "Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL"
+    },
+    "voyager": {
+      "name": "Voyager (Balanced)",
+      "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "topo": {
+      "name": "Topographic (USGS)",
+      "url": "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "USGS"
+    },
+    "hot": {
+      "name": "Humanitarian (HOT)",
+      "url": "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      "attribution": "&copy; OpenStreetMap contributors, Tiles courtesy of Humanitarian OpenStreetMap Team"
     }
   },
   "color_schemes": {

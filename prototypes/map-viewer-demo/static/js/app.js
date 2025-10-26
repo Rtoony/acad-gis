@@ -109,10 +109,15 @@ async function loadPresets() {
 // ===================================
 
 function initializeMap() {
-    // Create map
+    // Create map with enhanced zoom settings
     map = L.map('map', {
-        center: config.map_center || [37.7749, -122.4194],
+        center: config.map_center || [38.5, -122.8],
         zoom: config.initial_zoom || 10,
+        minZoom: 3,
+        maxZoom: 20,  // Allow deeper zoom (default is 18)
+        zoomDelta: 0.5,  // Smaller increments (default is 1)
+        zoomSnap: 0.5,  // Snap to half-zoom levels
+        wheelPxPerZoomLevel: 120,  // Finer scroll control
         zoomControl: true,
         fullscreenControl: true,
         fullscreenControlOptions: {
@@ -200,6 +205,42 @@ function setBasemap(basemapId) {
             url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             icon: 'fa-moon'
+        },
+        streets: {
+            name: 'Streets',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, DeLorme, NAVTEQ',
+            icon: 'fa-road'
+        },
+        toner: {
+            name: 'Toner (High Contrast)',
+            url: 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
+            attribution: 'Map tiles by Stamen Design, under CC BY 3.0',
+            icon: 'fa-th'
+        },
+        watercolor: {
+            name: 'Watercolor (Artistic)',
+            url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
+            attribution: 'Map tiles by Stamen Design, under CC BY 3.0',
+            icon: 'fa-palette'
+        },
+        voyager: {
+            name: 'Voyager (Balanced)',
+            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            icon: 'fa-compass'
+        },
+        topo: {
+            name: 'Topographic (USGS)',
+            url: 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'USGS',
+            icon: 'fa-layer-group'
+        },
+        hot: {
+            name: 'Humanitarian (HOT)',
+            url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+            attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team',
+            icon: 'fa-heart'
         }
     };
 
