@@ -1499,4 +1499,60 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// ===================================
+// Sidebar Resize Functionality
+// ===================================
+
+function initSidebarResize() {
+    const resizeHandle = document.getElementById('resizeHandle');
+    const controlPanel = document.getElementById('controlPanel');
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = controlPanel.offsetWidth;
+
+        resizeHandle.classList.add('active');
+        controlPanel.classList.add('resizing');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const width = startWidth + (e.clientX - startX);
+        const minWidth = 280;
+        const maxWidth = 800;
+
+        if (width >= minWidth && width <= maxWidth) {
+            controlPanel.style.width = width + 'px';
+            // Trigger map resize
+            if (map) {
+                setTimeout(() => map.invalidateSize(), 0);
+            }
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            resizeHandle.classList.remove('active');
+            controlPanel.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+}
+
+// Initialize resize on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    initSidebarResize();
+});
+
 console.log('Interactive Map Viewer initialized successfully!');

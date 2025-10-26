@@ -104,13 +104,36 @@ body {
     background: var(--bg-primary);
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
-    transition: transform var(--transition-normal);
+    transition: none;
     z-index: 900;
     box-shadow: 2px 0 8px var(--shadow);
+    position: relative;
 }
 
 .control-panel.collapsed {
     transform: translateX(-100%);
+}
+
+.control-panel.resizing {
+    user-select: none;
+}
+
+.resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 1000;
+    transition: background var(--transition-fast);
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+    background: var(--primary-color);
+    opacity: 0.5;
 }
 
 .panel-content {
@@ -355,7 +378,7 @@ body {
 /* Basemap Grid */
 .basemap-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--spacing-sm);
     margin-bottom: var(--spacing-md);
 }
