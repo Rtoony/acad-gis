@@ -9,6 +9,7 @@
 
 let map = null;
 let currentBasemap = null;
+let currentOverlay = null;
 let config = {};
 let presets = {};
 let dataLayers = {};
@@ -178,8 +179,8 @@ function setBasemap(basemapId) {
         },
         grayscale: {
             name: 'Grayscale',
-            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, HERE, Garmin',
             icon: 'fa-adjust'
         },
         satellite: {
@@ -196,7 +197,7 @@ function setBasemap(basemapId) {
         },
         light: {
             name: 'Light',
-            url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+            url: 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png',
             attribution: '&copy; OpenStreetMap &copy; CARTO',
             icon: 'fa-sun'
         },
@@ -211,12 +212,6 @@ function setBasemap(basemapId) {
             url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
             attribution: 'Esri, DeLorme, NAVTEQ',
             icon: 'fa-road'
-        },
-        toner: {
-            name: 'Toner (High Contrast)',
-            url: 'https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png',
-            attribution: 'Map tiles by Stamen Design, under CC BY 3.0',
-            icon: 'fa-th'
         },
         watercolor: {
             name: 'Watercolor (Artistic)',
@@ -241,12 +236,47 @@ function setBasemap(basemapId) {
             url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
             attribution: '&copy; OpenStreetMap contributors, Tiles style by Humanitarian OpenStreetMap Team',
             icon: 'fa-heart'
+        },
+        hybrid: {
+            name: 'Satellite + Labels',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, Maxar, GeoEye',
+            icon: 'fa-globe',
+            overlay: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+        },
+        darkmatter: {
+            name: 'Dark Matter',
+            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            icon: 'fa-circle'
+        },
+        natgeo: {
+            name: 'National Geographic',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, National Geographic',
+            icon: 'fa-globe-americas'
+        },
+        positron: {
+            name: 'Positron (Clean)',
+            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            icon: 'fa-lightbulb'
+        },
+        ocean: {
+            name: 'Ocean Basemap',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, GEBCO, NOAA, NGS',
+            icon: 'fa-water'
         }
     };
 
-    // Remove current basemap
+    // Remove current basemap and overlay
     if (currentBasemap) {
         map.removeLayer(currentBasemap);
+    }
+    if (currentOverlay) {
+        map.removeLayer(currentOverlay);
+        currentOverlay = null;
     }
 
     // Add new basemap
@@ -256,6 +286,14 @@ function setBasemap(basemapId) {
             attribution: basemap.attribution,
             opacity: currentState.basemapOpacity / 100
         }).addTo(map);
+
+        // Add overlay if specified (for hybrid maps)
+        if (basemap.overlay) {
+            currentOverlay = L.tileLayer(basemap.overlay, {
+                attribution: '',
+                opacity: 0.8
+            }).addTo(map);
+        }
 
         currentState.basemap = basemapId;
 
@@ -279,11 +317,15 @@ function populateBasemapGrid() {
         { id: 'light', name: 'Light', icon: 'fa-sun' },
         { id: 'dark', name: 'Dark', icon: 'fa-moon' },
         { id: 'streets', name: 'Streets', icon: 'fa-road' },
-        { id: 'toner', name: 'Toner (High Contrast)', icon: 'fa-th' },
         { id: 'watercolor', name: 'Watercolor (Artistic)', icon: 'fa-palette' },
         { id: 'voyager', name: 'Voyager (Balanced)', icon: 'fa-compass' },
         { id: 'topo', name: 'Topographic (USGS)', icon: 'fa-layer-group' },
-        { id: 'hot', name: 'Humanitarian (HOT)', icon: 'fa-heart' }
+        { id: 'hot', name: 'Humanitarian (HOT)', icon: 'fa-heart' },
+        { id: 'hybrid', name: 'Satellite + Labels', icon: 'fa-globe' },
+        { id: 'darkmatter', name: 'Dark Matter', icon: 'fa-circle' },
+        { id: 'natgeo', name: 'National Geographic', icon: 'fa-globe-americas' },
+        { id: 'positron', name: 'Positron (Clean)', icon: 'fa-lightbulb' },
+        { id: 'ocean', name: 'Ocean Basemap', icon: 'fa-water' }
     ];
 
     const grid = document.getElementById('basemapGrid');

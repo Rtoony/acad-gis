@@ -13,8 +13,8 @@
     },
     "grayscale": {
       "name": "Grayscale",
-      "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, HERE, Garmin"
     },
     "satellite": {
       "name": "Satellite",
@@ -28,7 +28,7 @@
     },
     "light": {
       "name": "Light",
-      "url": "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
+      "url": "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png",
       "attribution": "&copy; OpenStreetMap &copy; CARTO"
     },
     "dark": {
@@ -40,11 +40,6 @@
       "name": "Streets",
       "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
       "attribution": "Esri, DeLorme, NAVTEQ"
-    },
-    "toner": {
-      "name": "Toner (High Contrast)",
-      "url": "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png",
-      "attribution": "Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under ODbL"
     },
     "watercolor": {
       "name": "Watercolor (Artistic)",
@@ -65,6 +60,31 @@
       "name": "Humanitarian (HOT)",
       "url": "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
       "attribution": "&copy; OpenStreetMap contributors, Tiles courtesy of Humanitarian OpenStreetMap Team"
+    },
+    "hybrid": {
+      "name": "Satellite + Labels",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, Maxar, GeoEye"
+    },
+    "darkmatter": {
+      "name": "Dark Matter",
+      "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "natgeo": {
+      "name": "National Geographic",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, National Geographic"
+    },
+    "positron": {
+      "name": "Positron (Clean)",
+      "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "ocean": {
+      "name": "Ocean Basemap",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, GEBCO, NOAA, NGS"
     }
   },
   "color_schemes": {
