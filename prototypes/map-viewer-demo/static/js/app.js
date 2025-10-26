@@ -59,15 +59,62 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Configuration and Data Loading
 // ===================================
 
+// ===================================
+// Error Notification System
+// ===================================
+
+function showError(message, duration = 5000) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-notification';
+    errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-circle"></i>
+        <span>${message}</span>
+        <button class="error-close">&times;</button>
+    `;
+
+    document.body.appendChild(errorDiv);
+
+    const closeBtn = errorDiv.querySelector('.error-close');
+    closeBtn.addEventListener('click', () => {
+        errorDiv.classList.add('fade-out');
+        setTimeout(() => errorDiv.remove(), 300);
+    });
+
+    setTimeout(() => {
+        errorDiv.classList.add('fade-out');
+        setTimeout(() => errorDiv.remove(), 300);
+    }, duration);
+}
+
+function showSuccess(message, duration = 3000) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-notification';
+    successDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i>
+        <span>${message}</span>
+    `;
+
+    document.body.appendChild(successDiv);
+
+    setTimeout(() => {
+        successDiv.classList.add('fade-out');
+        setTimeout(() => successDiv.remove(), 300);
+    }, duration);
+}
+
 async function loadConfig() {
     try {
         const response = await fetch('/api/config');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         config = await response.json();
     } catch (error) {
         console.error('Error loading config:', error);
+        showError('Failed to load configuration. Using default settings.');
         // Use defaults if config fails to load
         config = {
-            map_center: [37.7749, -122.4194],
+            map_center: [38.5, -122.8],
             initial_zoom: 10,
             default_basemap: 'osm'
         };
@@ -75,33 +122,52 @@ async function loadConfig() {
 }
 
 async function loadLayers() {
+    showLoading(true);
     try {
         const response = await fetch('/api/layers');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const layers = await response.json();
 
         for (const layer of layers) {
-            const dataResponse = await fetch(layer.url);
-            const data = await dataResponse.json();
-            dataLayers[layer.name] = {
-                ...layer,
-                data: data,
-                visible: false
-            };
+            try {
+                const dataResponse = await fetch(layer.url);
+                if (!dataResponse.ok) {
+                    throw new Error(`HTTP error! status: ${dataResponse.status}`);
+                }
+                const data = await dataResponse.json();
+                dataLayers[layer.name] = {
+                    ...layer,
+                    data: data,
+                    visible: false
+                };
+            } catch (layerError) {
+                console.error(`Error loading layer ${layer.name}:`, layerError);
+                showError(`Failed to load layer: ${layer.display_name || layer.name}`);
+            }
         }
 
         populateLayersList();
+        showLoading(false);
     } catch (error) {
         console.error('Error loading layers:', error);
+        showError('Failed to load data layers. Please refresh the page.');
+        showLoading(false);
     }
 }
 
 async function loadPresets() {
     try {
         const response = await fetch('/api/presets');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
         presets = await response.json();
         populatePresetsList();
     } catch (error) {
         console.error('Error loading presets:', error);
+        showError('Failed to load preset modes. Preset functionality may be limited.');
     }
 }
 
@@ -270,22 +336,31 @@ function setBasemap(basemapId) {
         }
     };
 
-    // Remove current basemap and overlay
-    if (currentBasemap) {
-        map.removeLayer(currentBasemap);
-    }
-    if (currentOverlay) {
-        map.removeLayer(currentOverlay);
-        currentOverlay = null;
-    }
+    try {
+        // Remove current basemap and overlay
+        if (currentBasemap) {
+            map.removeLayer(currentBasemap);
+        }
+        if (currentOverlay) {
+            map.removeLayer(currentOverlay);
+            currentOverlay = null;
+        }
 
-    // Add new basemap
-    const basemap = basemaps[basemapId];
-    if (basemap) {
+        // Add new basemap
+        const basemap = basemaps[basemapId];
+        if (!basemap) {
+            throw new Error(`Basemap ${basemapId} not found`);
+        }
+
         currentBasemap = L.tileLayer(basemap.url, {
             attribution: basemap.attribution,
             opacity: currentState.basemapOpacity / 100
         }).addTo(map);
+
+        // Listen for tile load errors
+        currentBasemap.on('tileerror', function(error) {
+            console.warn('Basemap tile load error:', error);
+        });
 
         // Add overlay if specified (for hybrid maps)
         if (basemap.overlay) {
@@ -293,6 +368,10 @@ function setBasemap(basemapId) {
                 attribution: '',
                 opacity: 0.8
             }).addTo(map);
+
+            currentOverlay.on('tileerror', function(error) {
+                console.warn('Overlay tile load error:', error);
+            });
         }
 
         currentState.basemap = basemapId;
@@ -305,6 +384,11 @@ function setBasemap(basemapId) {
         if (activeOption) {
             activeOption.classList.add('active');
         }
+
+        showSuccess(`Basemap changed to ${basemap.name}`);
+    } catch (error) {
+        console.error('Error changing basemap:', error);
+        showError(`Failed to load basemap. ${error.message}`);
     }
 }
 
@@ -372,17 +456,20 @@ function toggleLayer(layerName, visible) {
 }
 
 function addLayerToMap(layerName) {
-    const layer = dataLayers[layerName];
-    if (!layer || !layer.data) return;
+    try {
+        const layer = dataLayers[layerName];
+        if (!layer || !layer.data) {
+            throw new Error(`Layer ${layerName} not found or has no data`);
+        }
 
-    // Remove existing layer group if it exists
-    removeLayerFromMap(layerName);
+        // Remove existing layer group if it exists
+        removeLayerFromMap(layerName);
 
-    const layerGroup = L.geoJSON(layer.data, {
-        pointToLayer: (feature, latlng) => createMarker(feature, latlng, layerName),
-        style: (feature) => getFeatureStyle(feature, layerName),
-        onEachFeature: (feature, layer) => bindFeaturePopup(feature, layer)
-    });
+        const layerGroup = L.geoJSON(layer.data, {
+            pointToLayer: (feature, latlng) => createMarker(feature, latlng, layerName),
+            style: (feature) => getFeatureStyle(feature, layerName),
+            onEachFeature: (feature, layer) => bindFeaturePopup(feature, layer)
+        });
 
     if (currentState.clusterMarkers && layerName === 'projects') {
         markerClusterGroup.clearLayers();
@@ -396,11 +483,15 @@ function addLayerToMap(layerName) {
         layerGroup.addTo(map);
     }
 
-    layerGroups[layerName] = layerGroup;
+        layerGroups[layerName] = layerGroup;
 
-    // Apply opacity
-    if (layerGroup.setOpacity) {
-        layerGroup.setOpacity(currentState.layerOpacity / 100);
+        // Apply opacity
+        if (layerGroup.setOpacity) {
+            layerGroup.setOpacity(currentState.layerOpacity / 100);
+        }
+    } catch (error) {
+        console.error(`Error adding layer ${layerName} to map:`, error);
+        showError(`Failed to display layer: ${dataLayers[layerName]?.display_name || layerName}`);
     }
 }
 
@@ -669,6 +760,22 @@ function applyMarkerSize(size) {
     });
 }
 
+function applyFontSize(size) {
+    currentState.fontSize = size;
+
+    // Update the dynamic styles
+    updateMarkerStyles();
+
+    // Reload visible layers to apply new font sizes to labels
+    const visibleLayers = currentState.layers.slice();
+    visibleLayers.forEach(layerName => {
+        addLayerToMap(layerName);
+    });
+
+    // Update legend if visible
+    updateLegend();
+}
+
 // ===================================
 // Legend Management
 // ===================================
@@ -934,8 +1041,7 @@ function initializeControls() {
 
     // Font size
     document.getElementById('fontSize').addEventListener('change', (e) => {
-        currentState.fontSize = e.target.value;
-        // Apply font size changes (this would affect labels and popups)
+        applyFontSize(e.target.value);
     });
 
     // Show labels
@@ -1479,25 +1585,39 @@ document.addEventListener('DOMContentLoaded', () => {
     setupExportModal();
 });
 
-// Add CSS for pulsing animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-        50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
-    }
+// Add CSS for pulsing animation and dynamic styles
+const dynamicStyle = document.createElement('style');
+dynamicStyle.id = 'dynamic-marker-styles';
+updateMarkerStyles();
+document.head.appendChild(dynamicStyle);
 
-    .marker-label {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        font-weight: 600;
-        font-size: ${currentState.fontSize === 'small' ? '10px' : currentState.fontSize === 'large' ? '14px' : '12px'};
-        color: #2c3e50;
-        text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white;
-    }
-`;
-document.head.appendChild(style);
+function updateMarkerStyles() {
+    const fontSize = currentState.fontSize === 'small' ? '10px' : currentState.fontSize === 'large' ? '14px' : '12px';
+    dynamicStyle.textContent = `
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+        }
+
+        .marker-label {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            font-weight: 600;
+            font-size: ${fontSize};
+            color: #2c3e50;
+            text-shadow: 1px 1px 2px white, -1px -1px 2px white, 1px -1px 2px white, -1px 1px 2px white;
+        }
+
+        .leaflet-popup-content {
+            font-size: ${fontSize};
+        }
+
+        .legend {
+            font-size: ${fontSize};
+        }
+    `;
+}
 
 // ===================================
 // Sidebar Resize Functionality
