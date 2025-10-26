@@ -255,6 +255,105 @@
       color: #60a5fa;
       border-bottom-color: #60a5fa;
     }
+    .basemap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .basemap-option {
+      aspect-ratio: 1;
+      border: 2px solid rgba(59,130,246,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.2s;
+      background-size: cover;
+      background-position: center;
+    }
+    .basemap-option:hover {
+      border-color: rgba(59,130,246,0.5);
+      transform: translateY(-2px);
+    }
+    .basemap-option.active {
+      border-color: #60a5fa;
+      border-width: 3px;
+    }
+    .basemap-option-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 4px;
+      font-size: 0.7rem;
+      text-align: center;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-container input[type="range"] {
+      flex: 1;
+      height: 4px;
+      background: rgba(59,130,246,0.2);
+      border-radius: 2px;
+      outline: none;
+    }
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #60a5fa;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider-container span {
+      min-width: 45px;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+    }
+    select.form-select {
+      width: 100%;
+      background: rgba(15,23,42,0.8);
+      color: #e0e7ff;
+      border: 1px solid rgba(59,130,246,0.35);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+    }
+    .legend-box {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      background: rgba(15,23,42,0.95);
+      border: 1px solid rgba(59,130,246,0.35);
+      border-radius: 8px;
+      padding: 12px;
+      max-width: 200px;
+      z-index: 1000;
+    }
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #60a5fa;
+      font-size: 0.9rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+      font-size: 0.8rem;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body class="grid-background">
@@ -275,6 +374,74 @@
         )
       )
     ));
+
+    // Basemap configuration
+    const BASEMAP_OPTIONS = {
+      osm: {
+        name: 'OpenStreetMap',
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk9TTTwvdGV4dD48L3N2Zz4='
+      },
+      esri_world: {
+        name: 'Esri Imagery',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri, Maxar',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzRhNmE0YSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TYXRlbGxpdGU8L3RleHQ+PC9zdmc+'
+      },
+      esri_topo: {
+        name: 'Esri Topo',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZTRkNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRvcG88L3RleHQ+PC9zdmc+'
+      },
+      esri_street: {
+        name: 'Esri Streets',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y4ZjhmOCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlN0cmVldHM8L3RleHQ+PC9zdmc+'
+      },
+      dark: {
+        name: 'Dark Mode',
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; OpenStreetMap, &copy; CartoDB',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzFhMWExYSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5EYXJrPC90ZXh0Pjwvc3ZnPg=='
+      },
+      terrain: {
+        name: 'Terrain',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenTopoMap',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2QyYjQ4YyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRlcnJhaW48L3RleHQ+PC9zdmc+'
+      }
+    };
+
+    // Color scheme configurations
+    const COLOR_SCHEMES = {
+      standard: {
+        QA_POINT: '#3b82f6',
+        QA_LINE: '#ef4444',
+        QA_AREA: '#22c55e',
+        DEFAULT: '#94a3b8'
+      },
+      vibrant: {
+        QA_POINT: '#8b5cf6',
+        QA_LINE: '#f59e0b',
+        QA_AREA: '#10b981',
+        DEFAULT: '#6b7280'
+      },
+      high_contrast: {
+        QA_POINT: '#000000',
+        QA_LINE: '#ff0000',
+        QA_AREA: '#00ff00',
+        DEFAULT: '#666666'
+      },
+      colorblind_friendly: {
+        QA_POINT: '#0173b2',
+        QA_LINE: '#de8f05',
+        QA_AREA: '#029e73',
+        DEFAULT: '#949494'
+      }
+    };
 
     // External layer services configuration
     const EXTERNAL_LAYER_SERVICES = {
@@ -378,6 +545,23 @@
       const [searchResults, setSearchResults] = useState([]);
       const [searchLoading, setSearchLoading] = useState(false);
 
+      // Basemap & styling state
+      const [currentBasemap, setCurrentBasemap] = useState('osm');
+      const [basemapOpacity, setBasemapOpacity] = useState(100);
+      const [hideBasemap, setHideBasemap] = useState(false);
+      const [colorScheme, setColorScheme] = useState('standard');
+      const [markerSize, setMarkerSize] = useState('medium');
+      const [fontSize, setFontSize] = useState('medium');
+      const [layerOpacity, setLayerOpacity] = useState(85);
+
+      // Display state
+      const [showLegend, setShowLegend] = useState(true);
+      const [showScale, setShowScale] = useState(true);
+      const [showAttribution, setShowAttribution] = useState(true);
+
+      // Refs for basemap layer
+      const basemapLayerRef = useRef(null);
+
       // Load projects on mount
       useEffect(() => {
         async function loadProjects() {
@@ -396,36 +580,22 @@
       useEffect(() => {
         if (mapRef.current || !mapEl.current) return;
 
-        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const basemapConfig = BASEMAP_OPTIONS[currentBasemap];
+        const basemapLayer = L.tileLayer(basemapConfig.url, {
           maxZoom: 20,
-          attribution: '&copy; OpenStreetMap contributors'
+          attribution: basemapConfig.attribution,
+          opacity: basemapOpacity / 100
         });
-
-        const esri = L.tileLayer(
-          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          {
-            maxZoom: 20,
-            attribution: '&copy; Esri, Maxar'
-          }
-        );
 
         const map = L.map(mapEl.current, {
           center: [38.4405, -122.7144], // Santa Rosa, CA
           zoom: 12,
-          layers: [osm],
+          layers: [basemapLayer],
           zoomControl: false
         });
 
         L.control.zoom({ position: 'topright' }).addTo(map);
         L.control.scale({ position: 'bottomleft' }).addTo(map);
-        L.control.layers(
-          {
-            'OpenStreetMap': osm,
-            'Esri Imagery': esri
-          },
-          {},
-          { position: 'topright' }
-        ).addTo(map);
 
         // Track mouse coordinates
         map.on('mousemove', (e) => {
@@ -436,12 +606,40 @@
         });
 
         mapRef.current = map;
+        basemapLayerRef.current = basemapLayer;
 
         return () => {
           map.remove();
           mapRef.current = null;
         };
       }, []);
+
+      // Handle basemap changes
+      useEffect(() => {
+        if (!mapRef.current) return;
+
+        const basemapConfig = BASEMAP_OPTIONS[currentBasemap];
+        if (basemapLayerRef.current) {
+          mapRef.current.removeLayer(basemapLayerRef.current);
+        }
+
+        if (!hideBasemap) {
+          const newBasemap = L.tileLayer(basemapConfig.url, {
+            maxZoom: 20,
+            attribution: basemapConfig.attribution,
+            opacity: basemapOpacity / 100
+          });
+          newBasemap.addTo(mapRef.current);
+          basemapLayerRef.current = newBasemap;
+        }
+      }, [currentBasemap, hideBasemap]);
+
+      // Handle basemap opacity changes
+      useEffect(() => {
+        if (basemapLayerRef.current) {
+          basemapLayerRef.current.setOpacity(basemapOpacity / 100);
+        }
+      }, [basemapOpacity]);
 
       // Load project features
       useEffect(() => {
@@ -471,27 +669,30 @@
             }
 
             // Add GeoJSON layer
+            const sizeMultiplier = getMarkerSizeMultiplier();
             const layer = L.geoJSON(geojson, {
               style: (feature) => {
                 const featureType = feature.properties.feature_type;
-                const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                const color = getFeatureColor(featureType);
+                const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
                 return {
-                  color: style.color,
-                  fillColor: style.fillColor || style.color,
-                  weight: style.weight,
-                  fillOpacity: style.fillOpacity,
-                  opacity: style.opacity
+                  color: color,
+                  fillColor: color,
+                  weight: baseStyle.weight,
+                  fillOpacity: (baseStyle.fillOpacity || 0.5) * (layerOpacity / 100),
+                  opacity: (baseStyle.opacity || 0.8) * (layerOpacity / 100)
                 };
               },
               pointToLayer: (feature, latlng) => {
                 const featureType = feature.properties.feature_type;
-                const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                const color = getFeatureColor(featureType);
+                const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
                 return L.circleMarker(latlng, {
-                  radius: style.radius,
-                  color: style.color,
-                  fillColor: style.fillColor || style.color,
-                  weight: style.weight,
-                  fillOpacity: style.fillOpacity
+                  radius: (baseStyle.radius || 5) * sizeMultiplier,
+                  color: color,
+                  fillColor: color,
+                  weight: baseStyle.weight,
+                  fillOpacity: (baseStyle.fillOpacity || 0.7) * (layerOpacity / 100)
                 });
               },
               onEachFeature: (feature, layer) => {
@@ -539,27 +740,30 @@
         }
 
         // Re-add with updated filter
+        const sizeMultiplier = getMarkerSizeMultiplier();
         const layer = L.geoJSON(projectData, {
           style: (feature) => {
             const featureType = feature.properties.feature_type;
-            const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            const color = getFeatureColor(featureType);
+            const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
             return {
-              color: style.color,
-              fillColor: style.fillColor || style.color,
-              weight: style.weight,
-              fillOpacity: style.fillOpacity,
-              opacity: style.opacity
+              color: color,
+              fillColor: color,
+              weight: baseStyle.weight,
+              fillOpacity: (baseStyle.fillOpacity || 0.5) * (layerOpacity / 100),
+              opacity: (baseStyle.opacity || 0.8) * (layerOpacity / 100)
             };
           },
           pointToLayer: (feature, latlng) => {
             const featureType = feature.properties.feature_type;
-            const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            const color = getFeatureColor(featureType);
+            const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
             return L.circleMarker(latlng, {
-              radius: style.radius,
-              color: style.color,
-              fillColor: style.fillColor || style.color,
-              weight: style.weight,
-              fillOpacity: style.fillOpacity
+              radius: (baseStyle.radius || 5) * sizeMultiplier,
+              color: color,
+              fillColor: color,
+              weight: baseStyle.weight,
+              fillOpacity: (baseStyle.fillOpacity || 0.7) * (layerOpacity / 100)
             });
           },
           onEachFeature: (feature, layer) => {
@@ -580,7 +784,22 @@
 
         featureLayerRef.current = layer;
 
-      }, [visibleLayers, projectData]);
+      }, [visibleLayers, projectData, colorScheme, markerSize, layerOpacity]);
+
+      // Helper function to get color based on current scheme
+      const getFeatureColor = useCallback((featureType) => {
+        const scheme = COLOR_SCHEMES[colorScheme] || COLOR_SCHEMES.standard;
+        return scheme[featureType] || scheme.DEFAULT;
+      }, [colorScheme]);
+
+      // Helper function to get marker size multiplier
+      const getMarkerSizeMultiplier = useCallback(() => {
+        switch (markerSize) {
+          case 'small': return 0.7;
+          case 'large': return 1.3;
+          default: return 1;
+        }
+      }, [markerSize]);
 
       const toggleLayer = useCallback((featureType) => {
         setVisibleLayers(prev => {
@@ -852,6 +1071,21 @@
         return () => document.removeEventListener('keydown', handleKeyDown);
       }, [mouseCoords, clearMeasurements]);
 
+      // Handle display controls (scale, attribution)
+      useEffect(() => {
+        if (!mapRef.current) return;
+
+        const scaleControl = document.querySelector('.leaflet-control-scale');
+        const attributionControl = document.querySelector('.leaflet-control-attribution');
+
+        if (scaleControl) {
+          scaleControl.style.display = showScale ? 'block' : 'none';
+        }
+        if (attributionControl) {
+          attributionControl.style.display = showAttribution ? 'block' : 'none';
+        }
+      }, [showScale, showAttribution]);
+
       return React.createElement('div', { className: 'page-container' },
         React.createElement(HeaderComp, {
           title: 'Project Map Viewer',
@@ -896,15 +1130,23 @@
             React.createElement('button', {
               className: `tab ${activeTab === 'layers' ? 'active' : ''}`,
               onClick: () => setActiveTab('layers')
-            }, React.createElement('i', { className: 'fas fa-layer-group' }), ' Project Layers'),
+            }, React.createElement('i', { className: 'fas fa-layer-group' }), ' Layers'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'basemap' ? 'active' : ''}`,
+              onClick: () => setActiveTab('basemap')
+            }, React.createElement('i', { className: 'fas fa-map' }), ' Basemap'),
             React.createElement('button', {
               className: `tab ${activeTab === 'external' ? 'active' : ''}`,
               onClick: () => setActiveTab('external')
-            }, React.createElement('i', { className: 'fas fa-globe' }), ' External Layers'),
+            }, React.createElement('i', { className: 'fas fa-globe' }), ' External'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'settings' ? 'active' : ''}`,
+              onClick: () => setActiveTab('settings')
+            }, React.createElement('i', { className: 'fas fa-cog' }), ' Settings'),
             React.createElement('button', {
               className: `tab ${activeTab === 'measure' ? 'active' : ''}`,
               onClick: () => setActiveTab('measure')
-            }, React.createElement('i', { className: 'fas fa-ruler-combined' }), ' Measure'),
+            }, React.createElement('i', { className: 'fas fa-ruler' }), ' Measure'),
             React.createElement('button', {
               className: `tab ${activeTab === 'search' ? 'active' : ''}`,
               onClick: () => setActiveTab('search')
@@ -943,6 +1185,54 @@
             )
           ),
 
+          // Basemap Tab
+          activeTab === 'basemap' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-map' }),
+              ' Basemap Options'
+            ),
+            React.createElement('div', { className: 'basemap-grid' },
+              Object.keys(BASEMAP_OPTIONS).map(basemapId =>
+                React.createElement('div', {
+                  key: basemapId,
+                  className: `basemap-option ${currentBasemap === basemapId ? 'active' : ''}`,
+                  onClick: () => setCurrentBasemap(basemapId),
+                  style: { backgroundImage: `url(${BASEMAP_OPTIONS[basemapId].thumbnail})` }
+                },
+                  React.createElement('div', { className: 'basemap-option-label' },
+                    BASEMAP_OPTIONS[basemapId].name
+                  )
+                )
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-adjust' }),
+                ' Basemap Opacity'
+              ),
+              React.createElement('div', { className: 'slider-container' },
+                React.createElement('input', {
+                  type: 'range',
+                  min: 0,
+                  max: 100,
+                  value: basemapOpacity,
+                  onChange: (e) => setBasemapOpacity(Number(e.target.value))
+                }),
+                React.createElement('span', null, `${basemapOpacity}%`)
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: hideBasemap,
+                  onChange: (e) => setHideBasemap(e.target.checked)
+                }),
+                React.createElement('span', null, 'Hide Basemap')
+              )
+            )
+          ),
+
           // External Layers Tab
           activeTab === 'external' && React.createElement('div', { className: 'control-panel' },
             React.createElement('h3', null,
@@ -961,6 +1251,95 @@
                     React.createElement('span', null, EXTERNAL_LAYER_SERVICES[layerId].name)
                   )
                 )
+              )
+            )
+          ),
+
+          // Settings Tab
+          activeTab === 'settings' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-palette' }),
+              ' Styling'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-swatchbook' }),
+                ' Color Scheme'
+              ),
+              React.createElement('select', {
+                className: 'form-select',
+                value: colorScheme,
+                onChange: (e) => setColorScheme(e.target.value)
+              },
+                React.createElement('option', { value: 'standard' }, 'Standard'),
+                React.createElement('option', { value: 'vibrant' }, 'Vibrant'),
+                React.createElement('option', { value: 'high_contrast' }, 'High Contrast'),
+                React.createElement('option', { value: 'colorblind_friendly' }, 'Colorblind Friendly')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-map-marker-alt' }),
+                ' Marker Size'
+              ),
+              React.createElement('select', {
+                className: 'form-select',
+                value: markerSize,
+                onChange: (e) => setMarkerSize(e.target.value)
+              },
+                React.createElement('option', { value: 'small' }, 'Small'),
+                React.createElement('option', { value: 'medium' }, 'Medium'),
+                React.createElement('option', { value: 'large' }, 'Large')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-adjust' }),
+                ' Layer Opacity'
+              ),
+              React.createElement('div', { className: 'slider-container' },
+                React.createElement('input', {
+                  type: 'range',
+                  min: 0,
+                  max: 100,
+                  value: layerOpacity,
+                  onChange: (e) => setLayerOpacity(Number(e.target.value))
+                }),
+                React.createElement('span', null, `${layerOpacity}%`)
+              )
+            ),
+            React.createElement('h3', { style: { marginTop: '20px' } },
+              React.createElement('i', { className: 'fas fa-eye' }),
+              ' Display Options'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showLegend,
+                  onChange: (e) => setShowLegend(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Legend')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showScale,
+                  onChange: (e) => setShowScale(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Scale Bar')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showAttribution,
+                  onChange: (e) => setShowAttribution(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Attribution')
               )
             )
           ),
@@ -1086,7 +1465,24 @@
           ),
 
           // Map
-          React.createElement('div', { ref: mapEl, id: 'map' }),
+          React.createElement('div', { ref: mapEl, id: 'map', style: { position: 'relative' } },
+            // Legend overlay
+            showLegend && featureTypes.length > 0 && React.createElement('div', { className: 'legend-box' },
+              React.createElement('div', { className: 'legend-title' }, 'Legend'),
+              featureTypes.map(ft => {
+                const color = getFeatureColor(ft.feature_type);
+                return React.createElement('div', { key: ft.feature_type, className: 'legend-item' },
+                  React.createElement('div', {
+                    className: 'legend-color',
+                    style: { backgroundColor: color }
+                  }),
+                  React.createElement('span', null,
+                    FEATURE_STYLES[ft.feature_type]?.label || ft.feature_type
+                  )
+                );
+              })
+            )
+          ),
 
           // Status bar
           React.createElement('div', { className: 'status-bar' },
