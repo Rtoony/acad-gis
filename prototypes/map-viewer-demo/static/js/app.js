@@ -307,6 +307,163 @@ function initializeMap() {
         },
         edit: false
     });
+
+    // Initialize coordinate display
+    initCoordinateDisplay();
+}
+
+// ===================================
+// Coordinate Display
+// ===================================
+
+function initCoordinateDisplay() {
+    const coordDisplay = document.getElementById('coordinateDisplay');
+    const coordsText = document.getElementById('coordsText');
+
+    // Throttled coordinate update for performance
+    const updateCoordinates = throttle((e) => {
+        const lat = e.latlng.lat.toFixed(6);
+        const lng = e.latlng.lng.toFixed(6);
+        coordsText.textContent = `Lat: ${lat}, Lon: ${lng}`;
+    }, 50); // Update every 50ms max
+
+    // Track mouse movement on map
+    map.on('mousemove', updateCoordinates);
+
+    // Hide when mouse leaves map
+    map.on('mouseout', () => {
+        coordsText.textContent = 'Hover over map to see coordinates';
+    });
+}
+
+// ===================================
+// Keyboard Shortcuts
+// ===================================
+
+function initKeyboardShortcuts() {
+    let lastMousePosition = null;
+
+    // Track mouse position for copy coordinates shortcut
+    map.on('mousemove', (e) => {
+        lastMousePosition = e.latlng;
+    });
+
+    document.addEventListener('keydown', (e) => {
+        // Don't trigger shortcuts if user is typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        switch(e.key.toLowerCase()) {
+            case 'f':
+                // Toggle fullscreen
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    document.documentElement.requestFullscreen();
+                }
+                break;
+
+            case 'l':
+                // Toggle legend
+                const legend = document.getElementById('legend');
+                legend.classList.toggle('hidden');
+                break;
+
+            case 'escape':
+                // Close any open modals
+                document.querySelectorAll('.modal').forEach(modal => {
+                    modal.style.display = 'none';
+                });
+                break;
+
+            case 'r':
+                // Reset view
+                if (config.map_center) {
+                    map.setView(config.map_center, config.initial_zoom || 10);
+                    showSuccess('View reset to default');
+                }
+                break;
+
+            case 'c':
+                // Copy coordinates at mouse position
+                if (lastMousePosition) {
+                    const lat = lastMousePosition.lat.toFixed(6);
+                    const lng = lastMousePosition.lng.toFixed(6);
+                    const coordString = `${lat}, ${lng}`;
+
+                    navigator.clipboard.writeText(coordString).then(() => {
+                        showSuccess(`Coordinates copied: ${coordString}`);
+                    }).catch(() => {
+                        showError('Failed to copy coordinates to clipboard');
+                    });
+                }
+                break;
+
+            case '+':
+            case '=':
+                // Zoom in
+                map.zoomIn();
+                break;
+
+            case '-':
+                // Zoom out
+                map.zoomOut();
+                break;
+
+            case '?':
+            case 'h':
+                // Show keyboard shortcuts help
+                showKeyboardShortcutsHelp();
+                break;
+        }
+    });
+}
+
+function showKeyboardShortcutsHelp() {
+    const helpText = `
+        <div style="text-align: left; line-height: 1.8;">
+            <h3 style="margin-top: 0;">⌨️ Keyboard Shortcuts</h3>
+            <p><strong>F</strong> - Toggle Fullscreen</p>
+            <p><strong>L</strong> - Toggle Legend</p>
+            <p><strong>R</strong> - Reset View</p>
+            <p><strong>C</strong> - Copy Coordinates (at mouse position)</p>
+            <p><strong>+/=</strong> - Zoom In</p>
+            <p><strong>-</strong> - Zoom Out</p>
+            <p><strong>Esc</strong> - Close Modals</p>
+            <p><strong>? or H</strong> - Show This Help</p>
+        </div>
+    `;
+
+    // Create temporary modal for shortcuts
+    const helpModal = document.createElement('div');
+    helpModal.className = 'modal';
+    helpModal.style.display = 'flex';
+    helpModal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Keyboard Shortcuts</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                ${helpText}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(helpModal);
+
+    // Close handlers
+    const closeBtn = helpModal.querySelector('.modal-close');
+    closeBtn.addEventListener('click', () => {
+        helpModal.remove();
+    });
+
+    helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+            helpModal.remove();
+        }
+    });
 }
 
 // ===================================
@@ -1762,9 +1919,10 @@ function initSidebarResize() {
     });
 }
 
-// Initialize resize on DOMContentLoaded
+// Initialize resize and keyboard shortcuts on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
     initSidebarResize();
+    initKeyboardShortcuts();
 });
 
 console.log('Interactive Map Viewer initialized successfully!');
