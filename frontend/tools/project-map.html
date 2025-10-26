@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Map | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map {
+      height: calc(100vh - 280px);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .input, select.input {
+      background: rgba(15,23,42,0.8);
+      color: #e0e7ff;
+      border: 1px solid rgba(59,130,246,0.35);
+      padding: 8px 12px;
+      border-radius: 8px;
+      min-width: 200px;
+    }
+    .btn-secondary {
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.35);
+      color: #60a5fa;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(59,130,246,0.25);
+      border-color: rgba(59,130,246,0.5);
+    }
+    .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .layer-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(15,23,42,0.6);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .layer-toggle:hover {
+      background: rgba(15,23,42,0.8);
+      border-color: rgba(59,130,246,0.4);
+    }
+    .layer-toggle.active {
+      background: rgba(59,130,246,0.15);
+      border-color: rgba(59,130,246,0.5);
+    }
+    .layer-toggle input[type="checkbox"] {
+      margin: 0;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+      padding-top: 12px;
+      border-top: 1px solid rgba(59,130,246,0.15);
+      margin-top: 12px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .coordinate-display {
+      font-family: 'Courier New', monospace;
+      color: #60a5fa;
+    }
+  </style>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script type="text/babel">
+    const { useEffect, useRef, useState, useCallback } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Project Map'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+
+    // Feature type styling configuration
+    const FEATURE_STYLES = {
+      'QA_POINT': {
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        radius: 6,
+        weight: 2,
+        fillOpacity: 0.7,
+        label: 'QA Points'
+      },
+      'QA_LINE': {
+        color: '#ef4444',
+        weight: 3,
+        opacity: 0.8,
+        label: 'QA Lines'
+      },
+      'QA_AREA': {
+        color: '#22c55e',
+        fillColor: '#22c55e',
+        weight: 2,
+        fillOpacity: 0.3,
+        opacity: 0.8,
+        label: 'QA Areas'
+      },
+      'DEFAULT': {
+        color: '#94a3b8',
+        fillColor: '#94a3b8',
+        radius: 5,
+        weight: 2,
+        fillOpacity: 0.5,
+        label: 'Other'
+      }
+    };
+
+    function ProjectMap() {
+      const mapRef = useRef(null);
+      const mapEl = useRef(null);
+      const featureLayerRef = useRef(null);
+      const apiClient = window.apiClient;
+
+      const [projects, setProjects] = useState([]);
+      const [selectedProject, setSelectedProject] = useState('');
+      const [projectData, setProjectData] = useState(null);
+      const [featureTypes, setFeatureTypes] = useState([]);
+      const [visibleLayers, setVisibleLayers] = useState(new Set());
+      const [loading, setLoading] = useState(false);
+      const [featureCount, setFeatureCount] = useState(0);
+      const [mouseCoords, setMouseCoords] = useState(null);
+      const [error, setError] = useState(null);
+
+      // Load projects on mount
+      useEffect(() => {
+        async function loadProjects() {
+          try {
+            const data = await apiClient.request('GET', '/projects');
+            setProjects(data || []);
+          } catch (err) {
+            console.error('Failed to load projects:', err);
+            setError('Failed to load projects');
+          }
+        }
+        loadProjects();
+      }, []);
+
+      // Initialize map
+      useEffect(() => {
+        if (mapRef.current || !mapEl.current) return;
+
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 20,
+          attribution: '&copy; OpenStreetMap contributors'
+        });
+
+        const esri = L.tileLayer(
+          'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          {
+            maxZoom: 20,
+            attribution: '&copy; Esri, Maxar'
+          }
+        );
+
+        const map = L.map(mapEl.current, {
+          center: [38.4405, -122.7144], // Santa Rosa, CA
+          zoom: 12,
+          layers: [osm],
+          zoomControl: false
+        });
+
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        L.control.scale({ position: 'bottomleft' }).addTo(map);
+        L.control.layers(
+          {
+            'OpenStreetMap': osm,
+            'Esri Imagery': esri
+          },
+          {},
+          { position: 'topright' }
+        ).addTo(map);
+
+        // Track mouse coordinates
+        map.on('mousemove', (e) => {
+          setMouseCoords({
+            lat: e.latlng.lat.toFixed(6),
+            lng: e.latlng.lng.toFixed(6)
+          });
+        });
+
+        mapRef.current = map;
+
+        return () => {
+          map.remove();
+          mapRef.current = null;
+        };
+      }, []);
+
+      // Load project features
+      useEffect(() => {
+        if (!selectedProject || !mapRef.current) return;
+
+        async function loadProjectFeatures() {
+          setLoading(true);
+          setError(null);
+
+          try {
+            // Load feature types
+            const types = await apiClient.request('GET', `/projects/${selectedProject}/features/types`);
+            setFeatureTypes(types || []);
+
+            // Initialize visible layers (all on by default)
+            const typeNames = new Set((types || []).map(t => t.feature_type));
+            setVisibleLayers(typeNames);
+
+            // Load all features
+            const geojson = await apiClient.request('GET', `/projects/${selectedProject}/features`);
+            setProjectData(geojson);
+            setFeatureCount(geojson?.features?.length || 0);
+
+            // Clear existing layer
+            if (featureLayerRef.current) {
+              mapRef.current.removeLayer(featureLayerRef.current);
+            }
+
+            // Add GeoJSON layer
+            const layer = L.geoJSON(geojson, {
+              style: (feature) => {
+                const featureType = feature.properties.feature_type;
+                const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                return {
+                  color: style.color,
+                  fillColor: style.fillColor || style.color,
+                  weight: style.weight,
+                  fillOpacity: style.fillOpacity,
+                  opacity: style.opacity
+                };
+              },
+              pointToLayer: (feature, latlng) => {
+                const featureType = feature.properties.feature_type;
+                const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                return L.circleMarker(latlng, {
+                  radius: style.radius,
+                  color: style.color,
+                  fillColor: style.fillColor || style.color,
+                  weight: style.weight,
+                  fillOpacity: style.fillOpacity
+                });
+              },
+              onEachFeature: (feature, layer) => {
+                const props = feature.properties;
+                const popupContent = `
+                  <div style="font-size: 0.875rem;">
+                    <strong>Type:</strong> ${props.feature_type}<br>
+                    <strong>Layer:</strong> ${props.layer_name || 'N/A'}<br>
+                    ${props.metadata ? `<strong>Metadata:</strong> ${JSON.stringify(props.metadata, null, 2)}` : ''}
+                  </div>
+                `;
+                layer.bindPopup(popupContent);
+              },
+              filter: (feature) => {
+                return visibleLayers.has(feature.properties.feature_type);
+              }
+            }).addTo(mapRef.current);
+
+            featureLayerRef.current = layer;
+
+            // Fit bounds to features
+            if (geojson?.features?.length > 0) {
+              const bounds = layer.getBounds();
+              mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+            }
+
+          } catch (err) {
+            console.error('Failed to load project features:', err);
+            setError(err.message || 'Failed to load project features');
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        loadProjectFeatures();
+      }, [selectedProject]);
+
+      // Update layer visibility
+      useEffect(() => {
+        if (!projectData || !mapRef.current) return;
+
+        // Clear existing layer
+        if (featureLayerRef.current) {
+          mapRef.current.removeLayer(featureLayerRef.current);
+        }
+
+        // Re-add with updated filter
+        const layer = L.geoJSON(projectData, {
+          style: (feature) => {
+            const featureType = feature.properties.feature_type;
+            const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            return {
+              color: style.color,
+              fillColor: style.fillColor || style.color,
+              weight: style.weight,
+              fillOpacity: style.fillOpacity,
+              opacity: style.opacity
+            };
+          },
+          pointToLayer: (feature, latlng) => {
+            const featureType = feature.properties.feature_type;
+            const style = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            return L.circleMarker(latlng, {
+              radius: style.radius,
+              color: style.color,
+              fillColor: style.fillColor || style.color,
+              weight: style.weight,
+              fillOpacity: style.fillOpacity
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const popupContent = `
+              <div style="font-size: 0.875rem;">
+                <strong>Type:</strong> ${props.feature_type}<br>
+                <strong>Layer:</strong> ${props.layer_name || 'N/A'}<br>
+                ${props.metadata ? `<strong>Metadata:</strong> ${JSON.stringify(props.metadata, null, 2)}` : ''}
+              </div>
+            `;
+            layer.bindPopup(popupContent);
+          },
+          filter: (feature) => {
+            return visibleLayers.has(feature.properties.feature_type);
+          }
+        }).addTo(mapRef.current);
+
+        featureLayerRef.current = layer;
+
+      }, [visibleLayers, projectData]);
+
+      const toggleLayer = useCallback((featureType) => {
+        setVisibleLayers(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(featureType)) {
+            newSet.delete(featureType);
+          } else {
+            newSet.add(featureType);
+          }
+          return newSet;
+        });
+      }, []);
+
+      const handleZoomToExtent = useCallback(() => {
+        if (featureLayerRef.current) {
+          const bounds = featureLayerRef.current.getBounds();
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+        }
+      }, []);
+
+      return React.createElement('div', { className: 'page-container' },
+        React.createElement(HeaderComp, {
+          title: 'Project Map Viewer',
+          subtitle: 'Visualize geo-referenced project features from Supabase'
+        }),
+
+        React.createElement('div', { className: 'content' },
+          // Toolbar
+          React.createElement('div', { className: 'toolbar' },
+            React.createElement('select', {
+              className: 'input',
+              value: selectedProject,
+              onChange: (e) => setSelectedProject(e.target.value),
+              disabled: loading
+            },
+              React.createElement('option', { value: '' }, 'Select Project...'),
+              projects.map(p =>
+                React.createElement('option', {
+                  key: p.project_id,
+                  value: p.project_id
+                }, `${p.project_number || '—'} — ${p.project_name}`)
+              )
+            ),
+
+            selectedProject && React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: handleZoomToExtent,
+              disabled: !featureLayerRef.current
+            },
+              React.createElement('i', { className: 'fas fa-compress-arrows-alt' }),
+              ' Zoom to Extent'
+            ),
+
+            loading && React.createElement('span', { style: { color: '#60a5fa' } },
+              React.createElement('i', { className: 'fas fa-spinner fa-spin' }),
+              ' Loading...'
+            )
+          ),
+
+          // Layer Controls
+          featureTypes.length > 0 && React.createElement('div', { className: 'layer-controls' },
+            React.createElement('span', { style: { color: 'var(--color-text-secondary)', fontSize: '0.875rem' } }, 'Layers:'),
+            featureTypes.map(ft =>
+              React.createElement('label', {
+                key: ft.feature_type,
+                className: `layer-toggle ${visibleLayers.has(ft.feature_type) ? 'active' : ''}`,
+                title: `${ft.count} features`
+              },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: visibleLayers.has(ft.feature_type),
+                  onChange: () => toggleLayer(ft.feature_type)
+                }),
+                React.createElement('span', {
+                  style: {
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: (FEATURE_STYLES[ft.feature_type] || FEATURE_STYLES.DEFAULT).color,
+                    marginRight: '4px'
+                  }
+                }),
+                React.createElement('span', null,
+                  FEATURE_STYLES[ft.feature_type]?.label || ft.feature_type,
+                  ` (${ft.count})`
+                )
+              )
+            )
+          ),
+
+          // Error message
+          error && React.createElement('div', {
+            style: {
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fca5a5',
+              padding: '12px',
+              borderRadius: '8px',
+              marginTop: '12px'
+            }
+          },
+            React.createElement('i', { className: 'fas fa-exclamation-triangle' }),
+            ' ',
+            error
+          ),
+
+          // Map
+          React.createElement('div', { ref: mapEl, id: 'map' }),
+
+          // Status bar
+          React.createElement('div', { className: 'status-bar' },
+            React.createElement('div', { className: 'status-item' },
+              React.createElement('i', { className: 'fas fa-layer-group' }),
+              ` ${featureCount} features loaded`
+            ),
+            mouseCoords && React.createElement('div', { className: 'coordinate-display' },
+              `Lat: ${mouseCoords.lat}, Lon: ${mouseCoords.lng}`
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.render(
+      React.createElement(ProjectMap),
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
