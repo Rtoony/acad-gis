@@ -277,7 +277,13 @@ function populateBasemapGrid() {
         { id: 'satellite', name: 'Satellite', icon: 'fa-satellite' },
         { id: 'terrain', name: 'Terrain', icon: 'fa-mountain' },
         { id: 'light', name: 'Light', icon: 'fa-sun' },
-        { id: 'dark', name: 'Dark', icon: 'fa-moon' }
+        { id: 'dark', name: 'Dark', icon: 'fa-moon' },
+        { id: 'streets', name: 'Streets', icon: 'fa-road' },
+        { id: 'toner', name: 'Toner (High Contrast)', icon: 'fa-th' },
+        { id: 'watercolor', name: 'Watercolor (Artistic)', icon: 'fa-palette' },
+        { id: 'voyager', name: 'Voyager (Balanced)', icon: 'fa-compass' },
+        { id: 'topo', name: 'Topographic (USGS)', icon: 'fa-layer-group' },
+        { id: 'hot', name: 'Humanitarian (HOT)', icon: 'fa-heart' }
     ];
 
     const grid = document.getElementById('basemapGrid');
