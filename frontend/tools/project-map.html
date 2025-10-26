@@ -559,8 +559,83 @@
       const [showScale, setShowScale] = useState(true);
       const [showAttribution, setShowAttribution] = useState(true);
 
+      // Presets state
+      const [savedPresets, setSavedPresets] = useState([]);
+      const [presetName, setPresetName] = useState('');
+
+      // Advanced tools state
+      const [isFullscreen, setIsFullscreen] = useState(false);
+
       // Refs for basemap layer
       const basemapLayerRef = useRef(null);
+
+      // Predefined presets
+      const DEFAULT_PRESETS = [
+        {
+          id: 'standard',
+          name: 'Standard View',
+          description: 'Default balanced view with OSM basemap',
+          config: {
+            basemap: 'osm',
+            basemapOpacity: 100,
+            hideBasemap: false,
+            colorScheme: 'standard',
+            markerSize: 'medium',
+            layerOpacity: 85,
+            showLegend: true,
+            showScale: true,
+            showAttribution: true
+          }
+        },
+        {
+          id: 'satellite',
+          name: 'Satellite View',
+          description: 'High-contrast features on satellite imagery',
+          config: {
+            basemap: 'esri_world',
+            basemapOpacity: 100,
+            hideBasemap: false,
+            colorScheme: 'high_contrast',
+            markerSize: 'large',
+            layerOpacity: 90,
+            showLegend: true,
+            showScale: true,
+            showAttribution: true
+          }
+        },
+        {
+          id: 'presentation',
+          name: 'Presentation Mode',
+          description: 'Vibrant colors on clean basemap for presentations',
+          config: {
+            basemap: 'esri_street',
+            basemapOpacity: 70,
+            hideBasemap: false,
+            colorScheme: 'vibrant',
+            markerSize: 'large',
+            layerOpacity: 95,
+            showLegend: true,
+            showScale: false,
+            showAttribution: false
+          }
+        },
+        {
+          id: 'minimal',
+          name: 'Minimal View',
+          description: 'Focus on data with minimal distractions',
+          config: {
+            basemap: 'osm',
+            basemapOpacity: 50,
+            hideBasemap: false,
+            colorScheme: 'standard',
+            markerSize: 'medium',
+            layerOpacity: 100,
+            showLegend: false,
+            showScale: false,
+            showAttribution: false
+          }
+        }
+      ];
 
       // Load projects on mount
       useEffect(() => {
@@ -1086,6 +1161,94 @@
         }
       }, [showScale, showAttribution]);
 
+      // Load saved presets from localStorage on mount
+      useEffect(() => {
+        try {
+          const saved = localStorage.getItem('mapPresets');
+          if (saved) {
+            setSavedPresets(JSON.parse(saved));
+          }
+        } catch (err) {
+          console.error('Failed to load presets:', err);
+        }
+      }, []);
+
+      // Preset functions
+      const getCurrentConfig = useCallback(() => {
+        return {
+          basemap: currentBasemap,
+          basemapOpacity,
+          hideBasemap,
+          colorScheme,
+          markerSize,
+          layerOpacity,
+          showLegend,
+          showScale,
+          showAttribution
+        };
+      }, [currentBasemap, basemapOpacity, hideBasemap, colorScheme, markerSize, layerOpacity, showLegend, showScale, showAttribution]);
+
+      const applyPreset = useCallback((config) => {
+        setCurrentBasemap(config.basemap);
+        setBasemapOpacity(config.basemapOpacity);
+        setHideBasemap(config.hideBasemap);
+        setColorScheme(config.colorScheme);
+        setMarkerSize(config.markerSize);
+        setLayerOpacity(config.layerOpacity);
+        setShowLegend(config.showLegend);
+        setShowScale(config.showScale);
+        setShowAttribution(config.showAttribution);
+      }, []);
+
+      const saveCurrentPreset = useCallback(() => {
+        if (!presetName.trim()) {
+          alert('Please enter a preset name');
+          return;
+        }
+
+        const newPreset = {
+          id: `custom_${Date.now()}`,
+          name: presetName,
+          description: 'Custom saved preset',
+          config: getCurrentConfig(),
+          custom: true
+        };
+
+        const updated = [...savedPresets, newPreset];
+        setSavedPresets(updated);
+        localStorage.setItem('mapPresets', JSON.stringify(updated));
+        setPresetName('');
+        alert(`Preset "${presetName}" saved!`);
+      }, [presetName, savedPresets, getCurrentConfig]);
+
+      const deletePreset = useCallback((presetId) => {
+        if (confirm('Delete this preset?')) {
+          const updated = savedPresets.filter(p => p.id !== presetId);
+          setSavedPresets(updated);
+          localStorage.setItem('mapPresets', JSON.stringify(updated));
+        }
+      }, [savedPresets]);
+
+      // Advanced tools functions
+      const toggleFullscreen = useCallback(() => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+          setIsFullscreen(true);
+        } else {
+          document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      }, []);
+
+      const exportMapAsPNG = useCallback(() => {
+        if (!mapRef.current) return;
+
+        alert('To export the map as PNG, please take a screenshot using your browser or OS:\n\n' +
+              'Windows: Win + Shift + S\n' +
+              'Mac: Cmd + Shift + 4\n' +
+              'Chrome: Right-click → Save image as');
+      }, []);
+
       return React.createElement('div', { className: 'page-container' },
         React.createElement(HeaderComp, {
           title: 'Project Map Viewer',
@@ -1119,6 +1282,23 @@
               ' Zoom to Extent'
             ),
 
+            selectedProject && React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: exportMapAsPNG,
+              title: 'Export map as image'
+            },
+              React.createElement('i', { className: 'fas fa-camera' }),
+              ' Export'
+            ),
+
+            React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: toggleFullscreen,
+              title: isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+            },
+              React.createElement('i', { className: isFullscreen ? 'fas fa-compress' : 'fas fa-expand' })
+            ),
+
             loading && React.createElement('span', { style: { color: '#60a5fa' } },
               React.createElement('i', { className: 'fas fa-spinner fa-spin' }),
               ' Loading...'
@@ -1150,7 +1330,11 @@
             React.createElement('button', {
               className: `tab ${activeTab === 'search' ? 'active' : ''}`,
               onClick: () => setActiveTab('search')
-            }, React.createElement('i', { className: 'fas fa-search' }), ' Search')
+            }, React.createElement('i', { className: 'fas fa-search' }), ' Search'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'presets' ? 'active' : ''}`,
+              onClick: () => setActiveTab('presets')
+            }, React.createElement('i', { className: 'fas fa-save' }), ' Presets')
           ),
 
           // Project Layers Tab
@@ -1442,6 +1626,87 @@
                   ),
                   React.createElement('div', { className: 'search-result-address' },
                     result.display_name
+                  )
+                )
+              )
+            )
+          ),
+
+          // Presets Tab
+          activeTab === 'presets' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-magic' }),
+              ' Quick Presets'
+            ),
+            React.createElement('div', { style: { display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' } },
+              DEFAULT_PRESETS.map(preset =>
+                React.createElement('div', {
+                  key: preset.id,
+                  className: 'layer-item',
+                  style: {
+                    cursor: 'pointer',
+                    padding: '12px',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    borderRadius: '8px'
+                  },
+                  onClick: () => applyPreset(preset.config)
+                },
+                  React.createElement('div', { style: { fontWeight: '600', color: '#60a5fa', marginBottom: '4px' } },
+                    preset.name
+                  ),
+                  React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--color-text-secondary)' } },
+                    preset.description
+                  )
+                )
+              )
+            ),
+            React.createElement('h3', { style: { marginTop: '24px' } },
+              React.createElement('i', { className: 'fas fa-save' }),
+              ' Save Current View'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null, 'Preset Name'),
+              React.createElement('input', {
+                type: 'text',
+                value: presetName,
+                onChange: (e) => setPresetName(e.target.value),
+                placeholder: 'My Custom View',
+                onKeyPress: (e) => e.key === 'Enter' && saveCurrentPreset()
+              })
+            ),
+            React.createElement('button', {
+              className: 'btn-primary btn-sm',
+              onClick: saveCurrentPreset,
+              style: { width: '100%' }
+            },
+              React.createElement('i', { className: 'fas fa-save' }),
+              ' Save Current Configuration'
+            ),
+            savedPresets.length > 0 && React.createElement(React.Fragment, null,
+              React.createElement('h3', { style: { marginTop: '24px' } },
+                React.createElement('i', { className: 'fas fa-star' }),
+                ' My Saved Presets'
+              ),
+              React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                savedPresets.map(preset =>
+                  React.createElement('div', {
+                    key: preset.id,
+                    className: 'layer-item',
+                    style: { justifyContent: 'space-between' }
+                  },
+                    React.createElement('span', {
+                      style: { cursor: 'pointer', flex: 1 },
+                      onClick: () => applyPreset(preset.config)
+                    }, preset.name),
+                    React.createElement('button', {
+                      className: 'btn-danger btn-sm',
+                      onClick: () => deletePreset(preset.id),
+                      style: { padding: '4px 8px' }
+                    },
+                      React.createElement('i', { className: 'fas fa-trash' })
+                    )
                   )
                 )
               )
