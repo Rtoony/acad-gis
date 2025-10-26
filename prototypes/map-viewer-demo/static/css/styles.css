@@ -447,6 +447,23 @@ body {
     accent-color: var(--primary-color);
 }
 
+.btn-remove {
+    background: transparent;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+    margin-left: auto;
+}
+
+.btn-remove:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
 .layer-icon {
     width: 24px;
     height: 24px;

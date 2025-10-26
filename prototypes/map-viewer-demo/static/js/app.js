@@ -68,15 +68,19 @@ let measurementHandlersInitialized = false;
 let searchMarker = null;
 let searchHandlersInitialized = false;
 let currentColorScheme = 'standard';
+let externalLayers = {}; // Store WMS/WFS layer objects
+let externalLayerConfig = {}; // Store configuration for each external layer
 let currentState = {
     basemap: 'osm',
     layers: [],
+    externalLayers: [], // Track active external layers
     markerSize: 'medium',
     fontSize: 'medium',
     showLabels: true,
     clusterMarkers: false,
     basemapOpacity: 100,
     layerOpacity: 85,
+    externalOpacity: 70,
     colorScheme: 'standard',
     showLegend: true,
     showScale: true,
@@ -1224,6 +1228,7 @@ async function saveCustomPreset(name, description) {
 
 function initializeUI() {
     populateBasemapGrid();
+    populateExternalLayersList();
     updateLegend();
 }
 
@@ -1268,6 +1273,24 @@ function initializeControls() {
             }
         });
     });
+
+    // External layer opacity
+    const externalOpacity = document.getElementById('externalOpacity');
+    if (externalOpacity) {
+        externalOpacity.addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('externalOpacityValue').textContent = `${value}%`;
+            updateExternalLayersOpacity(parseInt(value));
+        });
+    }
+
+    // Add custom WMS button
+    const addCustomWmsBtn = document.getElementById('addCustomWms');
+    if (addCustomWmsBtn) {
+        addCustomWmsBtn.addEventListener('click', () => {
+            addCustomWmsLayer();
+        });
+    }
 
     // Color scheme
     document.getElementById('colorScheme').addEventListener('change', (e) => {
@@ -1468,6 +1491,248 @@ function showLoading(show) {
     } else {
         loader.classList.add('hidden');
     }
+}
+
+// ===================================
+// External Layers (WMS/WFS)
+// ===================================
+
+// Pre-configured external layer services
+const EXTERNAL_LAYER_SERVICES = {
+    sonoma_parcels: {
+        name: 'Sonoma County Parcels',
+        type: 'wms',
+        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/Parcels/MapServer/WMSServer',
+        layers: '0',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'Sonoma County GIS',
+        minZoom: 12 // Only show at detailed zoom levels
+    },
+    sonoma_streets: {
+        name: 'Sonoma County Streets',
+        type: 'wms',
+        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/RoadCenterlines/MapServer/WMSServer',
+        layers: '0',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'Sonoma County GIS'
+    },
+    sonoma_utilities: {
+        name: 'Sonoma County Utilities',
+        type: 'wms',
+        url: 'https://gis.sonomacounty.org/arcgis/services/Public_Services/Public_Utilities/MapServer/WMSServer',
+        layers: '0,1,2',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'Sonoma County GIS'
+    },
+    sonoma_zoning: {
+        name: 'Sonoma County Zoning',
+        type: 'wms',
+        url: 'https://gis.sonomacounty.org/arcgis/services/Planning/Zoning/MapServer/WMSServer',
+        layers: '0',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'Sonoma County GIS'
+    },
+    sonoma_aerial: {
+        name: 'Sonoma County Aerial (2020)',
+        type: 'wms',
+        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/Aerials2020/MapServer/WMSServer',
+        layers: '0',
+        format: 'image/jpeg',
+        transparent: false,
+        attribution: 'Sonoma County GIS'
+    },
+    ca_cadastral: {
+        name: 'CA Cadastral Survey',
+        type: 'wms',
+        url: 'https://gis.blm.gov/arcgis/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/WMSServer',
+        layers: '1,2',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'BLM'
+    }
+};
+
+function populateExternalLayersList() {
+    const list = document.getElementById('externalLayersList');
+    if (!list) return;
+
+    list.innerHTML = '';
+
+    Object.keys(EXTERNAL_LAYER_SERVICES).forEach(layerId => {
+        const service = EXTERNAL_LAYER_SERVICES[layerId];
+
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        item.innerHTML = `
+            <label class="checkbox-label">
+                <input type="checkbox"
+                       id="external-${layerId}"
+                       data-layer-id="${layerId}">
+                <span>${service.name}</span>
+            </label>
+        `;
+
+        const checkbox = item.querySelector('input');
+        checkbox.addEventListener('change', (e) => {
+            toggleExternalLayer(layerId, e.target.checked);
+        });
+
+        list.appendChild(item);
+    });
+}
+
+function toggleExternalLayer(layerId, enabled) {
+    if (enabled) {
+        addExternalLayer(layerId);
+        if (!currentState.externalLayers.includes(layerId)) {
+            currentState.externalLayers.push(layerId);
+        }
+    } else {
+        removeExternalLayer(layerId);
+        currentState.externalLayers = currentState.externalLayers.filter(l => l !== layerId);
+    }
+}
+
+function addExternalLayer(layerId) {
+    try {
+        const service = EXTERNAL_LAYER_SERVICES[layerId] || externalLayerConfig[layerId];
+        if (!service) {
+            throw new Error(`Layer ${layerId} not found`);
+        }
+
+        // Remove existing layer if it exists
+        removeExternalLayer(layerId);
+
+        let layer;
+
+        if (service.type === 'wms') {
+            layer = L.tileLayer.wms(service.url, {
+                layers: service.layers,
+                format: service.format,
+                transparent: service.transparent,
+                attribution: service.attribution,
+                opacity: currentState.externalOpacity / 100,
+                minZoom: service.minZoom || 0,
+                maxZoom: service.maxZoom || 20
+            });
+        } else if (service.type === 'wfs') {
+            // WFS support - would need additional processing
+            showError('WFS layers not yet supported. Use WMS instead.');
+            return;
+        }
+
+        layer.addTo(map);
+        externalLayers[layerId] = layer;
+
+        showSuccess(`Added: ${service.name}`);
+    } catch (error) {
+        console.error(`Error adding external layer ${layerId}:`, error);
+        showError(`Failed to add layer: ${service?.name || layerId}`);
+    }
+}
+
+function removeExternalLayer(layerId) {
+    if (externalLayers[layerId]) {
+        map.removeLayer(externalLayers[layerId]);
+        delete externalLayers[layerId];
+    }
+}
+
+function addCustomWmsLayer() {
+    const url = document.getElementById('customWmsUrl').value.trim();
+    const layers = document.getElementById('customWmsLayers').value.trim();
+    const name = document.getElementById('customWmsName').value.trim();
+
+    if (!url) {
+        showError('Please enter a WMS URL');
+        return;
+    }
+
+    if (!layers) {
+        showError('Please enter layer IDs (e.g., 0,1,2)');
+        return;
+    }
+
+    if (!name) {
+        showError('Please enter a name for this layer');
+        return;
+    }
+
+    // Generate unique ID for custom layer
+    const layerId = 'custom_' + Date.now();
+
+    // Add to configuration
+    externalLayerConfig[layerId] = {
+        name: name,
+        type: 'wms',
+        url: url,
+        layers: layers,
+        format: 'image/png',
+        transparent: true,
+        attribution: 'Custom Layer'
+    };
+
+    // Add to the list
+    const list = document.getElementById('externalLayersList');
+    const item = document.createElement('div');
+    item.className = 'layer-item';
+    item.innerHTML = `
+        <label class="checkbox-label">
+            <input type="checkbox"
+                   id="external-${layerId}"
+                   data-layer-id="${layerId}"
+                   checked>
+            <span>${name} <small>(Custom)</small></span>
+        </label>
+        <button class="btn-remove" onclick="removeCustomLayer('${layerId}')"
+                title="Remove layer">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+
+    const checkbox = item.querySelector('input');
+    checkbox.addEventListener('change', (e) => {
+        toggleExternalLayer(layerId, e.target.checked);
+    });
+
+    list.appendChild(item);
+
+    // Add to map
+    addExternalLayer(layerId);
+    currentState.externalLayers.push(layerId);
+
+    // Clear form
+    document.getElementById('customWmsUrl').value = '';
+    document.getElementById('customWmsLayers').value = '';
+    document.getElementById('customWmsName').value = '';
+
+    showSuccess(`Added custom layer: ${name}`);
+}
+
+function removeCustomLayer(layerId) {
+    removeExternalLayer(layerId);
+    delete externalLayerConfig[layerId];
+
+    const checkbox = document.getElementById(`external-${layerId}`);
+    if (checkbox) {
+        checkbox.closest('.layer-item').remove();
+    }
+
+    currentState.externalLayers = currentState.externalLayers.filter(l => l !== layerId);
+}
+
+function updateExternalLayersOpacity(opacity) {
+    currentState.externalOpacity = opacity;
+
+    Object.values(externalLayers).forEach(layer => {
+        if (layer.setOpacity) {
+            layer.setOpacity(opacity / 100);
+        }
+    });
 }
 
 // ===================================
