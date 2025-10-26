@@ -720,6 +720,120 @@ body {
     color: var(--text-primary);
 }
 
+/* Upload Zone */
+.upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: var(--spacing-xl);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: var(--bg-secondary);
+}
+
+.upload-zone:hover {
+    border-color: var(--primary-color);
+    background: #e3f2fd;
+}
+
+.upload-zone.dragover {
+    border-color: var(--primary-color);
+    background: #e3f2fd;
+    border-style: solid;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+}
+
+.upload-text {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.upload-subtext {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.upload-formats {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.upload-status {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+.upload-status.hidden {
+    display: none;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    transition: width var(--transition-normal);
+    width: 0%;
+}
+
+.upload-status p {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.upload-status.success p {
+    color: var(--success-color);
+}
+
+.upload-status.error p {
+    color: var(--danger-color);
+}
+
+/* Export Message */
+.export-message {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-radius: 4px;
+    text-align: center;
+    font-size: var(--font-size-sm);
+}
+
+.export-message.hidden {
+    display: none;
+}
+
+.export-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.export-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     :root {

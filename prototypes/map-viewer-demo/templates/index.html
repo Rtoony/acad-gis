@@ -212,6 +212,33 @@
                     </div>
                 </section>
 
+                <!-- Import Data Section -->
+                <section class="panel-section">
+                    <div class="section-header" data-toggle="import">
+                        <h3><i class="fas fa-file-upload"></i> Import Data</h3>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <div id="importContent" class="section-content collapsed">
+                        <div class="upload-zone" id="uploadZone">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <p class="upload-text">Drag & drop files here</p>
+                            <p class="upload-subtext">or click to browse</p>
+                            <p class="upload-formats">Supported: GeoJSON, CSV, KML</p>
+                            <input type="file" id="fileInput" accept=".geojson,.json,.csv,.kml,.kmz" hidden>
+                        </div>
+                        <div id="uploadStatus" class="upload-status hidden">
+                            <div class="upload-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="progressFill"></div>
+                                </div>
+                                <p id="uploadMessage">Uploading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Tools Section -->
                 <section class="panel-section">
                     <div class="section-header" data-toggle="tools">
@@ -299,19 +326,32 @@
     <div id="exportModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Export Map</h3>
+                <h3>Export Data</h3>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="form-group">
+                    <label for="exportLayerSelect">Select Layer to Export:</label>
+                    <select id="exportLayerSelect" class="form-select">
+                        <option value="">-- Select a layer --</option>
+                    </select>
+                </div>
                 <p>Choose export format:</p>
                 <div class="export-options">
                     <button id="exportPNG" class="btn btn-primary btn-block">
-                        <i class="fas fa-image"></i> Export as PNG
+                        <i class="fas fa-image"></i> Export Map as PNG
                     </button>
-                    <button id="exportPDF" class="btn btn-primary btn-block">
-                        <i class="fas fa-file-pdf"></i> Export as PDF (Coming Soon)
+                    <button id="exportGeoJSON" class="btn btn-primary btn-block">
+                        <i class="fas fa-file-code"></i> Export Layer as GeoJSON
+                    </button>
+                    <button id="exportKML" class="btn btn-primary btn-block">
+                        <i class="fas fa-map-marker-alt"></i> Export Layer as KML
+                    </button>
+                    <button id="exportCSV" class="btn btn-primary btn-block">
+                        <i class="fas fa-file-csv"></i> Export Points as CSV
                     </button>
                 </div>
+                <div id="exportMessage" class="export-message hidden"></div>
             </div>
         </div>
     </div>

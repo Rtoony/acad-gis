@@ -1064,6 +1064,332 @@ function exportMapAsPNG() {
     });
 }
 
+// ===================================
+// File Upload Functions
+// ===================================
+
+function setupFileUpload() {
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const uploadMessage = document.getElementById('uploadMessage');
+    const progressFill = document.getElementById('progressFill');
+
+    // Click to browse
+    uploadZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // File selected via browse
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFileUpload(e.target.files[0]);
+        }
+    });
+
+    // Drag and drop
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+
+        if (e.dataTransfer.files.length > 0) {
+            handleFileUpload(e.dataTransfer.files[0]);
+        }
+    });
+}
+
+async function handleFileUpload(file) {
+    const uploadStatus = document.getElementById('uploadStatus');
+    const uploadMessage = document.getElementById('uploadMessage');
+    const progressFill = document.getElementById('progressFill');
+
+    // Validate file type
+    const validExtensions = ['geojson', 'json', 'csv', 'kml', 'kmz'];
+    const fileName = file.name.toLowerCase();
+    const fileExtension = fileName.split('.').pop();
+
+    if (!validExtensions.includes(fileExtension)) {
+        alert(`Invalid file type. Supported formats: ${validExtensions.join(', ')}`);
+        return;
+    }
+
+    // Show progress
+    uploadStatus.classList.remove('hidden', 'success', 'error');
+    uploadMessage.textContent = `Uploading ${file.name}...`;
+    progressFill.style.width = '50%';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            // Success
+            progressFill.style.width = '100%';
+            uploadStatus.classList.add('success');
+            uploadMessage.textContent = `Success! Loaded ${result.feature_count} features from ${result.layer_name}`;
+
+            // Add layer to map
+            addUploadedLayer(result.layer_name, result.geojson);
+
+            // Reset after 3 seconds
+            setTimeout(() => {
+                uploadStatus.classList.add('hidden');
+                progressFill.style.width = '0%';
+                fileInput.value = '';
+            }, 3000);
+        } else {
+            // Error
+            throw new Error(result.error || 'Upload failed');
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        uploadStatus.classList.add('error');
+        uploadMessage.textContent = `Error: ${error.message}`;
+        progressFill.style.width = '0%';
+
+        // Reset after 5 seconds
+        setTimeout(() => {
+            uploadStatus.classList.add('hidden');
+            fileInput.value = '';
+        }, 5000);
+    }
+}
+
+function addUploadedLayer(layerName, geojson) {
+    // Add to dataLayers
+    dataLayers[layerName] = {
+        name: layerName,
+        display_name: layerName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        type: 'uploaded',
+        data: geojson,
+        visible: true
+    };
+
+    // Add to map
+    addLayerToMap(layerName);
+    currentState.layers.push(layerName);
+
+    // Update layers list in UI
+    const layersList = document.getElementById('layersList');
+    const item = document.createElement('div');
+    item.className = 'layer-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `layer-${layerName}`;
+    checkbox.checked = true;
+    checkbox.addEventListener('change', (e) => {
+        toggleLayer(layerName, e.target.checked);
+    });
+
+    const icon = document.createElement('div');
+    icon.className = 'layer-icon';
+    icon.innerHTML = '<i class="fas fa-layer-group"></i>';
+
+    const info = document.createElement('div');
+    info.className = 'layer-info';
+    info.innerHTML = `
+        <div class="layer-name">${dataLayers[layerName].display_name}</div>
+        <div class="layer-count">${geojson.features.length} features (uploaded)</div>
+    `;
+
+    item.appendChild(checkbox);
+    item.appendChild(icon);
+    item.appendChild(info);
+
+    item.addEventListener('click', (e) => {
+        if (e.target !== checkbox) {
+            checkbox.checked = !checkbox.checked;
+            toggleLayer(layerName, checkbox.checked);
+        }
+    });
+
+    layersList.appendChild(item);
+
+    // Update legend
+    updateLegend();
+
+    // Zoom to layer bounds
+    if (layerGroups[layerName]) {
+        map.fitBounds(layerGroups[layerName].getBounds(), { padding: [50, 50] });
+    }
+}
+
+// ===================================
+// Export Functions
+// ===================================
+
+function setupExportModal() {
+    const exportBtn = document.getElementById('exportBtn');
+    const exportModal = document.getElementById('exportModal');
+    const exportLayerSelect = document.getElementById('exportLayerSelect');
+    const exportMessage = document.getElementById('exportMessage');
+
+    exportBtn.addEventListener('click', () => {
+        // Populate layer dropdown
+        exportLayerSelect.innerHTML = '<option value="">-- Select a layer --</option>';
+
+        Object.keys(dataLayers).forEach(layerName => {
+            if (dataLayers[layerName].visible) {
+                const option = document.createElement('option');
+                option.value = layerName;
+                option.textContent = dataLayers[layerName].display_name;
+                exportLayerSelect.appendChild(option);
+            }
+        });
+
+        exportMessage.classList.add('hidden');
+        showExportModal();
+    });
+
+    // Export GeoJSON
+    document.getElementById('exportGeoJSON').addEventListener('click', async () => {
+        const layerName = exportLayerSelect.value;
+        if (!layerName) {
+            showExportMessage('Please select a layer to export', 'error');
+            return;
+        }
+
+        try {
+            const layer = dataLayers[layerName];
+            const geojson = layer.data;
+
+            const response = await fetch('/api/export/geojson', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ geojson, layer_name: layerName })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${layerName}.geojson`;
+                link.click();
+                window.URL.revokeObjectURL(url);
+
+                showExportMessage('GeoJSON exported successfully!', 'success');
+            } else {
+                throw new Error('Export failed');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            showExportMessage('Error exporting GeoJSON', 'error');
+        }
+    });
+
+    // Export KML
+    document.getElementById('exportKML').addEventListener('click', async () => {
+        const layerName = exportLayerSelect.value;
+        if (!layerName) {
+            showExportMessage('Please select a layer to export', 'error');
+            return;
+        }
+
+        try {
+            const layer = dataLayers[layerName];
+            const geojson = layer.data;
+
+            const response = await fetch('/api/export/kml', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ geojson, layer_name: layerName })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${layerName}.kml`;
+                link.click();
+                window.URL.revokeObjectURL(url);
+
+                showExportMessage('KML exported successfully!', 'success');
+            } else {
+                throw new Error('Export failed');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            showExportMessage('Error exporting KML', 'error');
+        }
+    });
+
+    // Export CSV
+    document.getElementById('exportCSV').addEventListener('click', async () => {
+        const layerName = exportLayerSelect.value;
+        if (!layerName) {
+            showExportMessage('Please select a layer to export', 'error');
+            return;
+        }
+
+        try {
+            const layer = dataLayers[layerName];
+            const geojson = layer.data;
+
+            const response = await fetch('/api/export/csv', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ geojson, layer_name: layerName })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${layerName}.csv`;
+                link.click();
+                window.URL.revokeObjectURL(url);
+
+                showExportMessage('CSV exported successfully!', 'success');
+            } else {
+                const result = await response.json();
+                throw new Error(result.error || 'Export failed');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            showExportMessage(`Error: ${error.message}`, 'error');
+        }
+    });
+}
+
+function showExportMessage(message, type) {
+    const exportMessage = document.getElementById('exportMessage');
+    exportMessage.textContent = message;
+    exportMessage.className = `export-message ${type}`;
+    exportMessage.classList.remove('hidden');
+
+    if (type === 'success') {
+        setTimeout(() => {
+            exportMessage.classList.add('hidden');
+        }, 3000);
+    }
+}
+
+// Initialize upload and export on page load
+document.addEventListener('DOMContentLoaded', () => {
+    setupFileUpload();
+    setupExportModal();
+});
+
 // Add CSS for pulsing animation
 const style = document.createElement('style');
 style.textContent = `
