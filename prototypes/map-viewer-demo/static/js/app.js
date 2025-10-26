@@ -4,6 +4,52 @@
  */
 
 // ===================================
+// Performance Utilities
+// ===================================
+
+// Debounce function to limit expensive operations
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Throttle function for high-frequency events
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// Simple geometry simplification (reduce coordinate precision)
+function simplifyGeometry(geometry, tolerance = 0.0001) {
+    if (!geometry || !geometry.coordinates) return geometry;
+
+    const simplifyCoord = (coord) => {
+        if (Array.isArray(coord[0])) {
+            return coord.map(simplifyCoord);
+        }
+        return coord.map(c => Math.round(c / tolerance) * tolerance);
+    };
+
+    return {
+        ...geometry,
+        coordinates: simplifyCoord(geometry.coordinates)
+    };
+}
+
+// ===================================
 // Global Variables and State
 // ===================================
 
@@ -136,12 +182,37 @@ async function loadLayers() {
                 if (!dataResponse.ok) {
                     throw new Error(`HTTP error! status: ${dataResponse.status}`);
                 }
-                const data = await dataResponse.json();
+                let data = await dataResponse.json();
+
+                // Optimize complex geometries for better performance
+                if (data.features && data.features.length > 0) {
+                    data.features = data.features.map(feature => {
+                        // Simplify complex geometries (polygons and lines)
+                        if (feature.geometry &&
+                            (feature.geometry.type === 'Polygon' ||
+                             feature.geometry.type === 'MultiPolygon' ||
+                             feature.geometry.type === 'LineString' ||
+                             feature.geometry.type === 'MultiLineString')) {
+
+                            // Count coordinates to determine if simplification is needed
+                            const coordCount = JSON.stringify(feature.geometry.coordinates).length;
+                            if (coordCount > 1000) {
+                                // Simplify complex geometries
+                                feature.geometry = simplifyGeometry(feature.geometry, 0.001);
+                            }
+                        }
+                        return feature;
+                    });
+                }
+
                 dataLayers[layer.name] = {
                     ...layer,
                     data: data,
-                    visible: false
+                    visible: false,
+                    featureCount: data.features ? data.features.length : 0
                 };
+
+                console.log(`Loaded layer ${layer.name}: ${dataLayers[layer.name].featureCount} features`);
             } catch (layerError) {
                 console.error(`Error loading layer ${layer.name}:`, layerError);
                 showError(`Failed to load layer: ${layer.display_name || layer.name}`);
@@ -195,12 +266,19 @@ function initializeMap() {
     // Set initial basemap
     setBasemap(config.default_basemap || 'osm');
 
-    // Initialize marker cluster group
+    // Initialize marker cluster group with optimized settings
     markerClusterGroup = L.markerClusterGroup({
         maxClusterRadius: 50,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: true,
-        zoomToBoundsOnClick: true
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 18, // Disable clustering at high zoom for better performance
+        chunkedLoading: true, // Load markers in chunks for better performance
+        chunkInterval: 200, // Milliseconds between processing chunks
+        chunkDelay: 50, // Milliseconds to delay before starting chunk processing
+        animate: true,
+        animateAddingMarkers: false, // Disable animation when adding many markers for performance
+        removeOutsideVisibleBounds: true // Remove markers outside visible bounds for memory optimization
     });
 
     // Add scale control
@@ -1630,6 +1708,19 @@ function initSidebarResize() {
     let startX = 0;
     let startWidth = 0;
 
+    // Debounced map resize for better performance
+    const debouncedMapResize = debounce(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 100);
+
+    // Throttled resize for smoother visual updates
+    const throttledResize = throttle((width) => {
+        controlPanel.style.width = width + 'px';
+        debouncedMapResize();
+    }, 16); // ~60fps
+
     resizeHandle.addEventListener('mousedown', (e) => {
         isResizing = true;
         startX = e.clientX;
@@ -1651,11 +1742,7 @@ function initSidebarResize() {
         const maxWidth = 800;
 
         if (width >= minWidth && width <= maxWidth) {
-            controlPanel.style.width = width + 'px';
-            // Trigger map resize
-            if (map) {
-                setTimeout(() => map.invalidateSize(), 0);
-            }
+            throttledResize(width);
         }
     });
 
@@ -1666,6 +1753,11 @@ function initSidebarResize() {
             controlPanel.classList.remove('resizing');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+
+            // Final resize to ensure accuracy
+            if (map) {
+                map.invalidateSize();
+            }
         }
     });
 }
