@@ -1501,52 +1501,41 @@ function showLoading(show) {
 const EXTERNAL_LAYER_SERVICES = {
     sonoma_parcels: {
         name: 'Sonoma County Parcels',
-        type: 'wms',
-        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/Parcels/MapServer/WMSServer',
-        layers: '0',
-        format: 'image/png',
-        transparent: true,
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/CRAPublic/ParcelsPublic/FeatureServer/0',
         attribution: 'Sonoma County GIS',
-        minZoom: 12 // Only show at detailed zoom levels
+        minZoom: 13, // Parcels are detailed, only show when zoomed in
+        style: {
+            color: '#ff6b6b',
+            weight: 2,
+            fillOpacity: 0.1
+        }
     },
-    sonoma_streets: {
+    sonoma_roads: {
         name: 'Sonoma County Streets',
-        type: 'wms',
-        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/RoadCenterlines/MapServer/WMSServer',
-        layers: '0',
-        format: 'image/png',
-        transparent: true,
-        attribution: 'Sonoma County GIS'
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/TPWPublic/Streets_Roads/FeatureServer/0',
+        attribution: 'Sonoma County GIS',
+        style: {
+            color: '#4ecdc4',
+            weight: 2,
+            opacity: 0.8
+        }
     },
-    sonoma_utilities: {
-        name: 'Sonoma County Utilities',
-        type: 'wms',
-        url: 'https://gis.sonomacounty.org/arcgis/services/Public_Services/Public_Utilities/MapServer/WMSServer',
-        layers: '0,1,2',
-        format: 'image/png',
-        transparent: true,
-        attribution: 'Sonoma County GIS'
-    },
-    sonoma_zoning: {
-        name: 'Sonoma County Zoning',
-        type: 'wms',
-        url: 'https://gis.sonomacounty.org/arcgis/services/Planning/Zoning/MapServer/WMSServer',
-        layers: '0',
-        format: 'image/png',
-        transparent: true,
-        attribution: 'Sonoma County GIS'
-    },
-    sonoma_aerial: {
-        name: 'Sonoma County Aerial (2020)',
-        type: 'wms',
-        url: 'https://gis.sonomacounty.org/arcgis/services/BaseMaps/Aerials2020/MapServer/WMSServer',
-        layers: '0',
-        format: 'image/jpeg',
-        transparent: false,
-        attribution: 'Sonoma County GIS'
+    sonoma_buildings: {
+        name: 'Sonoma County Buildings',
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/BASEPublic/Buildings/FeatureServer/0',
+        attribution: 'Sonoma County GIS',
+        style: {
+            color: '#95e1d3',
+            weight: 1,
+            fillColor: '#95e1d3',
+            fillOpacity: 0.3
+        }
     },
     ca_cadastral: {
-        name: 'CA Cadastral Survey',
+        name: 'CA Cadastral Survey (BLM)',
         type: 'wms',
         url: 'https://gis.blm.gov/arcgis/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/WMSServer',
         layers: '1,2',
@@ -1610,6 +1599,7 @@ function addExternalLayer(layerId) {
         let layer;
 
         if (service.type === 'wms') {
+            // WMS Layer (standard tile-based service)
             layer = L.tileLayer.wms(service.url, {
                 layers: service.layers,
                 format: service.format,
@@ -1619,9 +1609,44 @@ function addExternalLayer(layerId) {
                 minZoom: service.minZoom || 0,
                 maxZoom: service.maxZoom || 20
             });
+        } else if (service.type === 'featureserver' || service.type === 'mapserver') {
+            // ArcGIS FeatureServer/MapServer using Esri Leaflet
+            if (typeof L.esri === 'undefined') {
+                showError('Esri Leaflet not loaded. Cannot display ArcGIS layers.');
+                return;
+            }
+
+            layer = L.esri.featureLayer({
+                url: service.url,
+                attribution: service.attribution,
+                minZoom: service.minZoom || 0,
+                maxZoom: service.maxZoom || 20,
+                style: function(feature) {
+                    return {
+                        ...service.style,
+                        opacity: currentState.externalOpacity / 100,
+                        fillOpacity: (service.style?.fillOpacity || 0.3) * (currentState.externalOpacity / 100)
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    // Add popup with feature properties
+                    if (feature.properties) {
+                        let popupContent = '<div style="max-width: 250px;">';
+                        Object.keys(feature.properties).forEach(key => {
+                            if (feature.properties[key] != null && key !== 'OBJECTID') {
+                                popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
+                            }
+                        });
+                        popupContent += '</div>';
+                        layer.bindPopup(popupContent);
+                    }
+                }
+            });
         } else if (service.type === 'wfs') {
-            // WFS support - would need additional processing
-            showError('WFS layers not yet supported. Use WMS instead.');
+            showError('WFS layers not yet supported. Use FeatureServer or WMS instead.');
+            return;
+        } else {
+            showError(`Unknown layer type: ${service.type}`);
             return;
         }
 
@@ -1648,12 +1673,7 @@ function addCustomWmsLayer() {
     const name = document.getElementById('customWmsName').value.trim();
 
     if (!url) {
-        showError('Please enter a WMS URL');
-        return;
-    }
-
-    if (!layers) {
-        showError('Please enter layer IDs (e.g., 0,1,2)');
+        showError('Please enter a service URL');
         return;
     }
 
@@ -1662,19 +1682,55 @@ function addCustomWmsLayer() {
         return;
     }
 
+    // Auto-detect service type from URL
+    let serviceType = 'wms';
+    let serviceUrl = url;
+
+    if (url.includes('/FeatureServer/')) {
+        serviceType = 'featureserver';
+        // FeatureServer URL is ready to use as-is
+    } else if (url.includes('/MapServer/') && url.includes('/WMSServer')) {
+        serviceType = 'wms';
+        // WMS URL is ready to use
+    } else if (url.includes('/MapServer/')) {
+        // MapServer URL - can be used as FeatureServer style
+        serviceType = 'featureserver';
+    } else if (url.includes('/WMSServer')) {
+        serviceType = 'wms';
+    }
+
     // Generate unique ID for custom layer
     const layerId = 'custom_' + Date.now();
 
-    // Add to configuration
-    externalLayerConfig[layerId] = {
-        name: name,
-        type: 'wms',
-        url: url,
-        layers: layers,
-        format: 'image/png',
-        transparent: true,
-        attribution: 'Custom Layer'
-    };
+    // Build configuration based on type
+    if (serviceType === 'wms') {
+        if (!layers) {
+            showError('Please enter layer IDs (e.g., 0,1,2) for WMS services');
+            return;
+        }
+
+        externalLayerConfig[layerId] = {
+            name: name,
+            type: 'wms',
+            url: serviceUrl,
+            layers: layers,
+            format: 'image/png',
+            transparent: true,
+            attribution: 'Custom Layer'
+        };
+    } else if (serviceType === 'featureserver') {
+        externalLayerConfig[layerId] = {
+            name: name,
+            type: 'featureserver',
+            url: serviceUrl,
+            attribution: 'Custom Layer',
+            style: {
+                color: '#3388ff',
+                weight: 2,
+                fillOpacity: 0.2
+            }
+        };
+    }
 
     // Add to the list
     const list = document.getElementById('externalLayersList');
@@ -1686,7 +1742,7 @@ function addCustomWmsLayer() {
                    id="external-${layerId}"
                    data-layer-id="${layerId}"
                    checked>
-            <span>${name} <small>(Custom)</small></span>
+            <span>${name} <small>(Custom - ${serviceType.toUpperCase()})</small></span>
         </label>
         <button class="btn-remove" onclick="removeCustomLayer('${layerId}')"
                 title="Remove layer">
@@ -1710,7 +1766,7 @@ function addCustomWmsLayer() {
     document.getElementById('customWmsLayers').value = '';
     document.getElementById('customWmsName').value = '';
 
-    showSuccess(`Added custom layer: ${name}`);
+    showSuccess(`Added custom layer: ${name} (${serviceType.toUpperCase()})`);
 }
 
 function removeCustomLayer(layerId) {

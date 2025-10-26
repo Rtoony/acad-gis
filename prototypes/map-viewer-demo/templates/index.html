@@ -114,21 +114,24 @@
                             </div>
                         </div>
 
-                        <!-- Custom WMS URL -->
+                        <!-- Custom ArcGIS/WMS URL -->
                         <div class="control-group">
                             <label for="customWmsUrl">
-                                <i class="fas fa-link"></i> Custom WMS URL
+                                <i class="fas fa-link"></i> Service URL
                             </label>
                             <input type="text" id="customWmsUrl" class="form-input"
-                                   placeholder="https://example.com/wms">
+                                   placeholder="FeatureServer, MapServer, or WMS URL">
+                            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">
+                                Supports: FeatureServer, MapServer, WMSServer
+                            </small>
                         </div>
 
                         <div class="control-group">
                             <label for="customWmsLayers">
-                                <i class="fas fa-layer-group"></i> Layers
+                                <i class="fas fa-layer-group"></i> Layers (WMS only)
                             </label>
                             <input type="text" id="customWmsLayers" class="form-input"
-                                   placeholder="0,1,2">
+                                   placeholder="0,1,2 (optional for FeatureServer)">
                         </div>
 
                         <div class="control-group">
@@ -482,6 +485,9 @@
 
     <!-- Leaflet Fullscreen JS -->
     <script src="https://unpkg.com/leaflet.fullscreen@2.4.0/Control.FullScreen.js"></script>
+
+    <!-- Esri Leaflet for ArcGIS Services -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 
     <!-- html2canvas for export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
