@@ -189,7 +189,7 @@ def get_default_presets():
             "basemapOpacity": 80,
             "layerOpacity": 100,
             "showLegend": True,
-            "showScale": false
+            "showScale": False
         },
         "print_ready": {
             "name": "Print Ready",
