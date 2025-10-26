@@ -62,6 +62,11 @@ let dataLayers = {};
 let layerGroups = {};
 let markerClusterGroup = null;
 let measureControl = null;
+let measurementLayer = null;
+let currentMeasurementMode = 'distance';
+let measurementHandlersInitialized = false;
+let searchMarker = null;
+let searchHandlersInitialized = false;
 let currentColorScheme = 'standard';
 let currentState = {
     basemap: 'osm',
@@ -1356,17 +1361,11 @@ function setupEventListeners() {
 
     // Tool buttons
     document.getElementById('measureBtn').addEventListener('click', () => {
-        if (!map.hasLayer(measureControl)) {
-            map.addControl(measureControl);
-        }
-        alert('Click on the map to start measuring. Use the drawing tools in the top-left corner.');
+        showMeasurementPanel();
     });
 
     document.getElementById('searchBtn').addEventListener('click', () => {
-        const query = prompt('Enter location to search:');
-        if (query) {
-            searchLocation(query);
-        }
+        showSearchPanel();
     });
 
     document.getElementById('exportBtn').addEventListener('click', () => {
@@ -1471,9 +1470,386 @@ function showLoading(show) {
     }
 }
 
+// ===================================
+// Measurement Functions
+// ===================================
+
+function showMeasurementPanel() {
+    document.getElementById('measurementPanel').classList.remove('hidden');
+    document.getElementById('searchPanel').classList.add('hidden');
+
+    if (!measurementLayer) {
+        measurementLayer = L.featureGroup().addTo(map);
+    }
+
+    initMeasurementHandlers();
+}
+
+function initMeasurementHandlers() {
+    if (measurementHandlersInitialized) {
+        startMeasurement();
+        return;
+    }
+
+    const measureDistance = document.getElementById('measureDistance');
+    const measureArea = document.getElementById('measureArea');
+    const closeMeasurement = document.getElementById('closeMeasurement');
+    const clearMeasurement = document.getElementById('clearMeasurement');
+
+    measureDistance.addEventListener('click', () => {
+        currentMeasurementMode = 'distance';
+        measureDistance.classList.add('active');
+        measureArea.classList.remove('active');
+        startMeasurement();
+    });
+
+    measureArea.addEventListener('click', () => {
+        currentMeasurementMode = 'area';
+        measureArea.classList.add('active');
+        measureDistance.classList.remove('active');
+        startMeasurement();
+    });
+
+    closeMeasurement.addEventListener('click', () => {
+        document.getElementById('measurementPanel').classList.add('hidden');
+        clearMeasurements();
+    });
+
+    clearMeasurement.addEventListener('click', () => {
+        clearMeasurements();
+    });
+
+    measurementHandlersInitialized = true;
+
+    // Start with distance measurement by default
+    startMeasurement();
+}
+
+function startMeasurement() {
+    clearMeasurements();
+
+    const resultDiv = document.getElementById('measurementResult');
+    resultDiv.innerHTML = '<p class="instruction">Click on map to start measuring</p>';
+
+    if (currentMeasurementMode === 'distance') {
+        startDistanceMeasurement();
+    } else {
+        startAreaMeasurement();
+    }
+}
+
+function startDistanceMeasurement() {
+    let points = [];
+    let polyline = null;
+    let markers = [];
+
+    const clickHandler = (e) => {
+        points.push(e.latlng);
+
+        // Add marker
+        const marker = L.circleMarker(e.latlng, {
+            radius: 5,
+            color: '#3388ff',
+            fillColor: '#3388ff',
+            fillOpacity: 1
+        }).addTo(measurementLayer);
+        markers.push(marker);
+
+        // Draw line
+        if (polyline) {
+            measurementLayer.removeLayer(polyline);
+        }
+
+        if (points.length > 1) {
+            polyline = L.polyline(points, {
+                color: '#3388ff',
+                weight: 3,
+                dashArray: '5, 10'
+            }).addTo(measurementLayer);
+
+            // Calculate distance
+            const distance = calculateTotalDistance(points);
+            displayDistanceResult(distance);
+        }
+    };
+
+    map.on('click', clickHandler);
+
+    // Store handler for cleanup
+    measurementLayer._clickHandler = clickHandler;
+}
+
+function startAreaMeasurement() {
+    let points = [];
+    let polygon = null;
+    let markers = [];
+
+    const clickHandler = (e) => {
+        points.push(e.latlng);
+
+        // Add marker
+        const marker = L.circleMarker(e.latlng, {
+            radius: 5,
+            color: '#f357a1',
+            fillColor: '#f357a1',
+            fillOpacity: 1
+        }).addTo(measurementLayer);
+        markers.push(marker);
+
+        // Draw polygon
+        if (polygon) {
+            measurementLayer.removeLayer(polygon);
+        }
+
+        if (points.length > 2) {
+            polygon = L.polygon(points, {
+                color: '#f357a1',
+                weight: 3,
+                fillOpacity: 0.2
+            }).addTo(measurementLayer);
+
+            // Calculate area
+            const area = calculatePolygonArea(points);
+            displayAreaResult(area);
+        } else if (points.length === 2) {
+            const tempLine = L.polyline(points, {
+                color: '#f357a1',
+                weight: 3,
+                dashArray: '5, 10'
+            }).addTo(measurementLayer);
+        }
+    };
+
+    map.on('click', clickHandler);
+
+    // Store handler for cleanup
+    measurementLayer._clickHandler = clickHandler;
+}
+
+function calculateTotalDistance(points) {
+    let total = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        total += points[i].distanceTo(points[i + 1]);
+    }
+    return total;
+}
+
+function calculatePolygonArea(points) {
+    const polygon = L.polygon(points);
+    // Convert to square meters using geodesic area calculation
+    let area = 0;
+    const coords = points.map(p => [p.lng, p.lat]);
+
+    // Simple spherical excess formula for area calculation
+    const R = 6378137; // Earth's radius in meters
+    const toRad = Math.PI / 180;
+
+    for (let i = 0; i < coords.length; i++) {
+        const p1 = coords[i];
+        const p2 = coords[(i + 1) % coords.length];
+        area += (p2[0] - p1[0]) * toRad * (2 + Math.sin(p1[1] * toRad) + Math.sin(p2[1] * toRad));
+    }
+
+    area = Math.abs(area * R * R / 2);
+    return area;
+}
+
+function displayDistanceResult(meters) {
+    const km = meters / 1000;
+    const miles = meters / 1609.34;
+    const feet = meters * 3.28084;
+
+    const resultDiv = document.getElementById('measurementResult');
+    resultDiv.innerHTML = `
+        <div class="result-item">
+            <div class="result-label">Distance</div>
+            <div class="result-value">${meters < 1000 ? meters.toFixed(2) + ' m' : km.toFixed(2) + ' km'}</div>
+        </div>
+        <div class="result-item">
+            <div class="result-label">Miles / Feet</div>
+            <div class="result-value">${miles < 1 ? feet.toFixed(2) + ' ft' : miles.toFixed(2) + ' mi'}</div>
+        </div>
+    `;
+}
+
+function displayAreaResult(sqMeters) {
+    const sqKm = sqMeters / 1000000;
+    const acres = sqMeters / 4046.86;
+    const sqMiles = sqMeters / 2589988;
+
+    const resultDiv = document.getElementById('measurementResult');
+    resultDiv.innerHTML = `
+        <div class="result-item">
+            <div class="result-label">Area</div>
+            <div class="result-value">${sqMeters < 10000 ? sqMeters.toFixed(2) + ' m²' : sqKm.toFixed(2) + ' km²'}</div>
+        </div>
+        <div class="result-item">
+            <div class="result-label">Acres / Sq Miles</div>
+            <div class="result-value">${acres < 640 ? acres.toFixed(2) + ' acres' : sqMiles.toFixed(2) + ' mi²'}</div>
+        </div>
+    `;
+}
+
+function clearMeasurements() {
+    if (measurementLayer) {
+        measurementLayer.clearLayers();
+
+        // Remove click handler
+        if (measurementLayer._clickHandler) {
+            map.off('click', measurementLayer._clickHandler);
+            measurementLayer._clickHandler = null;
+        }
+    }
+
+    const resultDiv = document.getElementById('measurementResult');
+    if (resultDiv) {
+        resultDiv.innerHTML = '<p class="instruction">Click on map to start measuring</p>';
+    }
+}
+
+// ===================================
+// Search Functions
+// ===================================
+
+function showSearchPanel() {
+    document.getElementById('searchPanel').classList.remove('hidden');
+    document.getElementById('measurementPanel').classList.add('hidden');
+
+    initSearchHandlers();
+}
+
+function initSearchHandlers() {
+    if (searchHandlersInitialized) {
+        return;
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    const searchSubmit = document.getElementById('searchSubmit');
+    const closeSearch = document.getElementById('closeSearch');
+
+    searchSubmit.addEventListener('click', () => {
+        const query = searchInput.value.trim();
+        if (query) {
+            searchLocation(query);
+        }
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const query = searchInput.value.trim();
+            if (query) {
+                searchLocation(query);
+            }
+        }
+    });
+
+    closeSearch.addEventListener('click', () => {
+        document.getElementById('searchPanel').classList.add('hidden');
+        clearSearchMarker();
+    });
+
+    searchHandlersInitialized = true;
+}
+
 async function searchLocation(query) {
-    // Simple implementation - in production, you'd use a geocoding service
-    alert(`Search functionality would find: ${query}\n(Geocoding service integration needed)`);
+    const searchLoading = document.getElementById('searchLoading');
+    const searchResults = document.getElementById('searchResults');
+
+    searchLoading.classList.remove('hidden');
+    searchResults.classList.add('hidden');
+    searchResults.innerHTML = '';
+
+    try {
+        // Use Nominatim (OpenStreetMap) geocoding service
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+            {
+                headers: {
+                    'User-Agent': 'Interactive Map Viewer'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error('Search request failed');
+        }
+
+        const results = await response.json();
+
+        searchLoading.classList.add('hidden');
+
+        if (results.length === 0) {
+            searchResults.innerHTML = '<p class="instruction">No results found. Try a different search.</p>';
+            searchResults.classList.remove('hidden');
+            return;
+        }
+
+        displaySearchResults(results);
+
+    } catch (error) {
+        console.error('Search error:', error);
+        searchLoading.classList.add('hidden');
+        searchResults.innerHTML = '<p class="instruction" style="color: var(--danger-color);">Search failed. Please try again.</p>';
+        searchResults.classList.remove('hidden');
+    }
+}
+
+function displaySearchResults(results) {
+    const searchResults = document.getElementById('searchResults');
+
+    searchResults.innerHTML = results.map((result, index) => `
+        <div class="search-result-item" data-index="${index}" data-lat="${result.lat}" data-lon="${result.lon}">
+            <div class="search-result-name">${result.display_name.split(',')[0]}</div>
+            <div class="search-result-address">${result.display_name}</div>
+        </div>
+    `).join('');
+
+    searchResults.classList.remove('hidden');
+
+    // Add click handlers
+    searchResults.querySelectorAll('.search-result-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const lat = parseFloat(item.dataset.lat);
+            const lon = parseFloat(item.dataset.lon);
+            const name = item.querySelector('.search-result-name').textContent;
+
+            zoomToLocation(lat, lon, name);
+        });
+    });
+}
+
+function zoomToLocation(lat, lon, name) {
+    // Clear previous search marker
+    clearSearchMarker();
+
+    // Add new marker
+    searchMarker = L.marker([lat, lon], {
+        icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        })
+    }).addTo(map);
+
+    searchMarker.bindPopup(`<b>${name}</b>`).openPopup();
+
+    // Zoom to location
+    map.setView([lat, lon], 15, {
+        animate: true,
+        duration: 1
+    });
+
+    showSuccess(`Found: ${name}`);
+}
+
+function clearSearchMarker() {
+    if (searchMarker) {
+        map.removeLayer(searchMarker);
+        searchMarker = null;
+    }
 }
 
 function exportMapAsPNG() {

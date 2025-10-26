@@ -302,6 +302,55 @@
                 <div class="spinner"></div>
                 <p>Loading map data...</p>
             </div>
+
+            <!-- Measurement Panel -->
+            <div id="measurementPanel" class="measurement-panel hidden">
+                <div class="panel-header">
+                    <h4><i class="fas fa-ruler"></i> Measurement Tool</h4>
+                    <button id="closeMeasurement" class="close-btn">&times;</button>
+                </div>
+                <div class="panel-body">
+                    <div class="measurement-mode">
+                        <button id="measureDistance" class="btn btn-primary active">
+                            <i class="fas fa-arrows-alt-h"></i> Distance
+                        </button>
+                        <button id="measureArea" class="btn btn-primary">
+                            <i class="fas fa-vector-square"></i> Area
+                        </button>
+                    </div>
+                    <div id="measurementResult" class="measurement-result">
+                        <p class="instruction">Click on map to start measuring</p>
+                    </div>
+                    <div class="measurement-actions">
+                        <button id="clearMeasurement" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Panel -->
+            <div id="searchPanel" class="search-panel hidden">
+                <div class="panel-header">
+                    <h4><i class="fas fa-search"></i> Search Location</h4>
+                    <button id="closeSearch" class="close-btn">&times;</button>
+                </div>
+                <div class="panel-body">
+                    <div class="search-input-group">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search for a place...">
+                        <button id="searchSubmit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                    <div id="searchResults" class="search-results hidden">
+                        <!-- Results will be populated here -->
+                    </div>
+                    <div id="searchLoading" class="search-loading hidden">
+                        <div class="spinner-small"></div>
+                        <span>Searching...</span>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
