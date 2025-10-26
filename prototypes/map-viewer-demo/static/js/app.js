@@ -359,8 +359,8 @@ function setBasemap(basemapId) {
         },
         watercolor: {
             name: 'Watercolor (Artistic)',
-            url: 'https://stamen-tiles.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.jpg',
-            attribution: 'Map tiles by Stamen Design, under CC BY 3.0',
+            url: 'https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg',
+            attribution: 'Map tiles by Stamen Design, under CC BY 3.0. Hosted by Stadia Maps',
             icon: 'fa-palette'
         },
         voyager: {
@@ -389,10 +389,10 @@ function setBasemap(basemapId) {
             overlay: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
         },
         darkmatter: {
-            name: 'Dark Matter',
-            url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            icon: 'fa-circle'
+            name: 'Midnight (Dark Gray)',
+            url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+            attribution: 'Esri, HERE, Garmin',
+            icon: 'fa-moon'
         },
         natgeo: {
             name: 'National Geographic',
@@ -401,10 +401,10 @@ function setBasemap(basemapId) {
             icon: 'fa-globe-americas'
         },
         positron: {
-            name: 'Positron (Clean)',
-            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            attribution: '&copy; OpenStreetMap &copy; CARTO',
-            icon: 'fa-lightbulb'
+            name: 'Alidade Smooth',
+            url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+            attribution: '&copy; Stadia Maps &copy; OpenMapTiles &copy; OpenStreetMap',
+            icon: 'fa-circle-notch'
         },
         ocean: {
             name: 'Ocean Basemap',
@@ -484,9 +484,9 @@ function populateBasemapGrid() {
         { id: 'topo', name: 'Topographic (USGS)', icon: 'fa-layer-group' },
         { id: 'hot', name: 'Humanitarian (HOT)', icon: 'fa-heart' },
         { id: 'hybrid', name: 'Satellite + Labels', icon: 'fa-globe' },
-        { id: 'darkmatter', name: 'Dark Matter', icon: 'fa-circle' },
+        { id: 'darkmatter', name: 'Midnight (Dark Gray)', icon: 'fa-moon' },
         { id: 'natgeo', name: 'National Geographic', icon: 'fa-globe-americas' },
-        { id: 'positron', name: 'Positron (Clean)', icon: 'fa-lightbulb' },
+        { id: 'positron', name: 'Alidade Smooth', icon: 'fa-circle-notch' },
         { id: 'ocean', name: 'Ocean Basemap', icon: 'fa-water' }
     ];
 
