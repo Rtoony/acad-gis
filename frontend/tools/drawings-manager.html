@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drawings Manager | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    .badge-pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.75rem; }
+    .badge-dxf { background:rgba(33,150,243,0.15); color:#0d47a1; border:1px solid rgba(33,150,243,0.35); }
+    .badge-geo { background:rgba(76,175,80,0.15); color:#1b5e20; border:1px solid rgba(76,175,80,0.35); margin-left:6px; }
+  </style>
+  </head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <!-- Shared utilities -->
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script src="../shared/state.js"></script>
+  <script src="../shared/dev-tools.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Drawings Manager'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+    const DataTableComp = window.DataTable || (({ data }) => React.createElement('pre', null, JSON.stringify(data, null, 2)));
+    const LoadingSpinnerComp = window.LoadingSpinner || (({ text }) => React.createElement('div', null, text || 'Loading...'));
+    const ModalComp = window.Modal || (({ isOpen, title, children, onClose }) => isOpen ? React.createElement('div', null, React.createElement('h3', null, title), children, React.createElement('button', { onClick: onClose }, 'Close')) : null);
+    const Toast = window.ToastManager || { info: console.log, success: console.log, warning: console.warn, error: console.error };
+    const apiClient = window.API;
+
+    function DrawingsManager() {
+      const [projects, setProjects] = useState([]);
+      const [projectId, setProjectId] = useState('');
+      const [search, setSearch] = useState('');
+      const [drawings, setDrawings] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState('');
+      const [showView, setShowView] = useState(false);
+      const [showForm, setShowForm] = useState(false);
+      const [showUpload, setShowUpload] = useState(false);
+      const [selected, setSelected] = useState(null);
+      const [saving, setSaving] = useState(false);
+      const [uploadProgress, setUploadProgress] = useState(0);
+
+      const [formData, setFormData] = useState({
+        drawing_name: '', drawing_number: '', drawing_type: '', scale: '', description: '',
+        tags: '', is_georeferenced: false, drawing_epsg_code: '', drawing_coordinate_system: ''
+      });
+
+      const fetchProjects = async () => {
+        try {
+          const list = await apiClient.list('/projects');
+          setProjects(list);
+        } catch (e) {
+          console.warn('Failed to load projects', e);
+        }
+      };
+
+      const load = async () => {
+        setLoading(true); setError('');
+        try {
+          const limit = 500;
+          if (projectId) {
+            const data = await apiClient.request('GET', `/projects/${projectId}/drawings`);
+            const list = (data || []).map(d => ({
+              ...d,
+              flags: { has_content: !!d.has_content, is_georeferenced: !!d.is_georeferenced }
+            }));
+            setDrawings(list);
+          } else {
+            const data = await apiClient.list('/drawings', { limit, search: search || undefined });
+            const base = Array.isArray(data) ? data : (data?.drawings || data || []);
+            const list = (base || []).map(d => ({
+              ...d,
+              flags: { has_content: !!d.has_content, is_georeferenced: !!d.is_georeferenced }
+            }));
+            setDrawings(list);
+          }
+        } catch (e) {
+          setError(e.message || 'Failed to load drawings');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => { fetchProjects(); load(); }, []);
+      useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [search, projectId]);
+
+      const openCreate = () => {
+        setSelected(null);
+        setFormData({ drawing_name: '', drawing_number: '', drawing_type: '', scale: '', description: '', tags: '', is_georeferenced: false, drawing_epsg_code: '', drawing_coordinate_system: '' });
+        setShowForm(true);
+      };
+
+      const onView = (row) => { setSelected(row); setShowView(true); };
+      const onEdit = (row) => {
+        setSelected(row);
+        setFormData({
+          drawing_name: row.drawing_name || '',
+          drawing_number: row.drawing_number || '',
+          drawing_type: row.drawing_type || '',
+          scale: row.scale || '',
+          description: row.description || '',
+          tags: (row.tags || []).join(', '),
+          is_georeferenced: !!row.is_georeferenced,
+          drawing_epsg_code: row.drawing_epsg_code || '',
+          drawing_coordinate_system: row.drawing_coordinate_system || ''
+        });
+        setShowForm(true);
+      };
+      const onDelete = async (row) => {
+        if (!confirm(`Delete drawing \"${row.drawing_name}\"? This cannot be undone.`)) return;
+        try { await apiClient.delete('/drawings', row.drawing_id); Toast.success('Deleted'); await load(); }
+        catch (e) { Toast.error(e.message); }
+      };
+
+      const saveForm = async (e) => {
+        e?.preventDefault?.();
+        if (!formData.drawing_name.trim()) { Toast.error('Drawing name is required'); return; }
+        setSaving(true);
+        try {
+          const payload = {
+            drawing_name: formData.drawing_name.trim(),
+            drawing_number: formData.drawing_number || null,
+            drawing_type: formData.drawing_type || null,
+            scale: formData.scale || null,
+            description: formData.description || null,
+            tags: formData.tags ? formData.tags.split(',').map(s => s.trim()).filter(Boolean) : null,
+            is_georeferenced: !!formData.is_georeferenced,
+            drawing_epsg_code: formData.drawing_epsg_code || null,
+            drawing_coordinate_system: formData.drawing_coordinate_system || null,
+            project_id: projectId || null
+          };
+          if (selected) {
+            await apiClient.update('/drawings', selected.drawing_id, payload);
+            Toast.success('Drawing updated');
+          } else {
+            await apiClient.create('/drawings', payload);
+            Toast.success('Drawing created');
+          }
+          setShowForm(false);
+          await load();
+        } catch (err) {
+          Toast.error(err.message || 'Save failed');
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      const uploadDXF = async (e) => {
+        e?.preventDefault?.();
+        const fileInput = document.getElementById('dxf-file');
+        const projSelect = document.getElementById('upload-project');
+        const nameInput = document.getElementById('upload-name');
+        const geoCheck = document.getElementById('upload-geo');
+        const epsgInput = document.getElementById('upload-epsg');
+        if (!fileInput.files?.length) { Toast.error('Select a DXF file'); return; }
+        if (!projSelect.value) { Toast.error('Select a project'); return; }
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        fd.append('project_id', projSelect.value);
+        if (nameInput.value) fd.append('drawing_name', nameInput.value);
+        fd.append('is_georeferenced', geoCheck.checked ? 'true' : 'false');
+        if (epsgInput.value) fd.append('epsg_code', epsgInput.value);
+        try {
+          await apiClient.uploadWithProgress('/import/dxf', fd, (pct) => setUploadProgress(pct));
+          Toast.success('DXF imported');
+          setShowUpload(false);
+          setUploadProgress(0);
+          await load();
+        } catch (err) {
+          Toast.error(err.message || 'DXF import failed');
+        }
+      };
+
+      const columns = [
+        { key: 'drawing_number', label: 'Number', sortable: true },
+        { key: 'drawing_name', label: 'Drawing Name', sortable: true },
+        { key: 'drawing_type', label: 'Type', sortable: true },
+        { key: 'scale', label: 'Scale', sortable: true },
+        { key: 'project_name', label: 'Project', sortable: true },
+        { key: 'created_at', label: 'Created', sortable: true, format: 'date' },
+        { key: 'flags', label: 'Flags', sortable: false, render: (v) => (
+            React.createElement('span', null,
+              v && v.has_content ? React.createElement('span', { className: 'badge-pill badge-dxf' }, 'DXF') : null,
+              v && v.is_georeferenced ? React.createElement('span', { className: 'badge-pill badge-geo' }, 'GEO') : null
+            )
+        ) }
+      ];
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(HeaderComp, {
+            title: 'Drawings Manager',
+            subtitle: 'Organize, edit, and import drawings'
+          }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card mb-lg' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'card-title' }, 'Drawings'),
+                  React.createElement('div', { className: 'flex items-center gap-sm' },
+                    React.createElement('select', {
+                      className: 'form-select', value: projectId,
+                      onChange: (e) => setProjectId(e.target.value)
+                    },
+                      React.createElement('option', { value: '' }, 'All Projects'),
+                      projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_name}${p.project_number ? ' ('+p.project_number+')' : ''}`))
+                    ),
+                    React.createElement('input', {
+                      className: 'form-input', placeholder: 'Search name, number, project...',
+                      value: search, onChange: (e) => setSearch(e.target.value), style: { width: '280px' }
+                    }),
+                    React.createElement('button', { className: 'btn', onClick: load },
+                      React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh'
+                    ),
+                    React.createElement('button', { className: 'btn btn-secondary', onClick: openCreate },
+                      React.createElement('i', { className: 'fas fa-plus' }), ' New Drawing'
+                    ),
+                    React.createElement('button', { className: 'btn btn-primary', onClick: () => setShowUpload(true) },
+                      React.createElement('i', { className: 'fas fa-file-import' }), ' Upload DXF'
+                    )
+                  )
+                ),
+                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
+                loading ? React.createElement(LoadingSpinnerComp, { text: 'Loading drawings...' }) :
+                  React.createElement(DataTableComp, {
+                    data: drawings,
+                    columns,
+                    onView,
+                    onEdit,
+                    onDelete,
+                    searchable: true,
+                    pagination: true,
+                    pageSize: 20,
+                    emptyMessage: 'No drawings found'
+                  })
+              )
+            )
+          ),
+
+          // View modal
+          React.createElement(ModalComp, {
+            isOpen: showView,
+            onClose: () => setShowView(false),
+            title: selected ? `${selected.drawing_number || ''} ${selected.drawing_name || ''}`.trim() : 'Drawing'
+          },
+            selected && React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', null,
+                React.createElement('div', { className: 'text-muted' }, 'Type / Scale'),
+                React.createElement('div', null, `${selected.drawing_type || '-'} | ${selected.scale || '-'}`)
+              ),
+              React.createElement('div', null,
+                React.createElement('div', { className: 'text-muted' }, 'Project'),
+                React.createElement('div', null, selected.project_name || '-')
+              ),
+              React.createElement('div', null,
+                React.createElement('div', { className: 'text-muted' }, 'GEO / EPSG'),
+                React.createElement('div', null, `${selected.is_georeferenced ? 'Yes' : 'No'} ${selected.drawing_epsg_code ? ' | ' + selected.drawing_epsg_code : ''}`)
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('div', { className: 'text-muted' }, 'Description'),
+                React.createElement('div', null, selected.description || '-')
+              ),
+              React.createElement('div', { className: 'col-span-2 mt-md flex gap-sm justify-end' },
+                React.createElement('button', { className: 'btn', onClick: () => setShowView(false) }, 'Close'),
+                React.createElement('button', { className: 'btn btn-secondary', onClick: () => { setShowView(false); onEdit(selected); } }, 'Edit'),
+                React.createElement('button', { className: 'btn btn-danger', onClick: () => { setShowView(false); onDelete(selected); } }, 'Delete')
+              )
+            )
+          ),
+
+          // Create/Edit modal
+          React.createElement(ModalComp, {
+            isOpen: showForm,
+            onClose: () => setShowForm(false),
+            title: selected ? 'Edit Drawing' : 'New Drawing'
+          },
+            React.createElement('form', { onSubmit: saveForm },
+              React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Drawing Name'),
+                  React.createElement('input', { className: 'form-input', value: formData.drawing_name, onChange: e => setFormData({ ...formData, drawing_name: e.target.value }), required: true })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Number'),
+                  React.createElement('input', { className: 'form-input', value: formData.drawing_number, onChange: e => setFormData({ ...formData, drawing_number: e.target.value }) })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Type'),
+                  React.createElement('input', { className: 'form-input', value: formData.drawing_type, onChange: e => setFormData({ ...formData, drawing_type: e.target.value }) })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Scale'),
+                  React.createElement('input', { className: 'form-input', value: formData.scale, onChange: e => setFormData({ ...formData, scale: e.target.value }) })
+                ),
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Description'),
+                  React.createElement('textarea', { className: 'form-textarea', rows: 3, value: formData.description, onChange: e => setFormData({ ...formData, description: e.target.value }) })
+                ),
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Tags (comma separated)'),
+                  React.createElement('input', { className: 'form-input', value: formData.tags, onChange: e => setFormData({ ...formData, tags: e.target.value }) })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Is Georeferenced'),
+                  React.createElement('div', null,
+                    React.createElement('input', { id: 'geo-flag', type: 'checkbox', checked: formData.is_georeferenced, onChange: e => setFormData({ ...formData, is_georeferenced: e.target.checked }) }),
+                    React.createElement('label', { htmlFor: 'geo-flag', style: { marginLeft: '8px' } }, 'Enable GEO')
+                  )
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'EPSG Code'),
+                  React.createElement('input', { className: 'form-input', value: formData.drawing_epsg_code, onChange: e => setFormData({ ...formData, drawing_epsg_code: e.target.value }), placeholder: 'e.g., EPSG:2227' })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Coordinate System'),
+                  React.createElement('input', { className: 'form-input', value: formData.drawing_coordinate_system, onChange: e => setFormData({ ...formData, drawing_coordinate_system: e.target.value }), placeholder: 'e.g., NAD83 State Plane California III' })
+                )
+              ),
+              React.createElement('div', { className: 'mt-md flex gap-sm justify-end' },
+                React.createElement('button', { type: 'button', className: 'btn', onClick: () => setShowForm(false) }, 'Cancel'),
+                React.createElement('button', { type: 'submit', className: 'btn btn-primary', disabled: saving }, saving ? 'Saving...' : 'Save')
+              )
+            )
+          ),
+
+          // Upload DXF modal
+          React.createElement(ModalComp, {
+            isOpen: showUpload,
+            onClose: () => { setShowUpload(false); setUploadProgress(0); },
+            title: 'Upload DXF'
+          },
+            React.createElement('form', { onSubmit: uploadDXF },
+              React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'DXF File'),
+                  React.createElement('input', { id: 'dxf-file', type: 'file', accept: '.dxf', className: 'form-input', required: true })
+                ),
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Project'),
+                  React.createElement('select', { id: 'upload-project', className: 'form-select', defaultValue: projectId || '' },
+                    React.createElement('option', { value: '' }, 'Select project...'),
+                    projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_name}${p.project_number ? ' ('+p.project_number+')' : ''}`))
+                  )
+                ),
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Drawing Name (optional)'),
+                  React.createElement('input', { id: 'upload-name', className: 'form-input', placeholder: 'Defaults to file name' })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Is Georeferenced'),
+                  React.createElement('div', null,
+                    React.createElement('input', { id: 'upload-geo', type: 'checkbox' }),
+                    React.createElement('label', { htmlFor: 'upload-geo', style: { marginLeft: '8px' } }, 'Enable GEO')
+                  )
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'EPSG Code (optional)'),
+                  React.createElement('input', { id: 'upload-epsg', className: 'form-input', placeholder: 'e.g., 2227' })
+                )
+              ),
+              uploadProgress > 0 && React.createElement('div', { className: 'mt-md' }, `Upload: ${uploadProgress}%`),
+              React.createElement('div', { className: 'mt-md flex gap-sm justify-end' },
+                React.createElement('button', { type: 'button', className: 'btn', onClick: () => { setShowUpload(false); setUploadProgress(0); } }, 'Cancel'),
+                React.createElement('button', { type: 'submit', className: 'btn btn-primary' }, 'Upload')
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(DrawingsManager));
+  </script>
+</body>
+</html>

@@ -34,10 +34,11 @@ Response shape:
   - Excludes archived projects from `recent_projects` and `total_projects`
 
 ## Drawings
-- `GET /api/drawings` - list
+- `GET /api/drawings` - list (limit default 500; supports `search`)
+  - Returns key fields plus `has_content`, `is_georeferenced`, `cad_units`, `scale_factor`, and project info
 - `GET /api/drawings/{drawing_id}` - details
 - `GET /api/drawings/{drawing_id}/render` - summary + bounds (current)
-- Planned: `GET /api/drawings/{drawing_id}/extent`
+- `GET /api/drawings/{drawing_id}/extent` - full bounds without row limits
 - Planned: `GET /api/drawings/{drawing_id}/geojson?bbox=&srid=&simplify=`
 
 ## Layers (planned)

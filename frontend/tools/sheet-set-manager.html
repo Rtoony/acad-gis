@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sheet Set Manager | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    .two-col { display:grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+    .panel { background: linear-gradient(135deg, rgba(30,41,59,0.6), rgba(15,23,42,0.85)); border:1px solid rgba(59,130,246,0.25); border-radius: 10px; overflow:hidden; }
+    .panel-header { display:flex; justify-content:space-between; align-items:center; padding: 10px 14px; border-bottom:1px solid rgba(59,130,246,0.2); }
+    .panel-title { font-weight:700; }
+    .list { padding: 10px 14px; max-height: calc(100vh - 290px); overflow:auto; }
+    .set-card { border:1px solid rgba(148,163,184,0.25); border-radius:8px; padding:10px; margin-bottom:10px; background: rgba(2,6,23,0.35); cursor:pointer; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.7rem; border:1px solid rgba(59,130,246,0.3); color:#93c5fd; background:rgba(59,130,246,0.15); margin-left:6px; }
+    .topbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  </style>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+    const Header = window.Header || (({ title, subtitle, right }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', { className:'orbitron' }, title || 'Sheet Set Manager'),
+            React.createElement('div', { className: 'header-subtitle' }, subtitle || 'Deliverable packages and sheets')
+          ),
+          right || React.createElement(window.ApiStatus || (()=>React.createElement('div', null)), null)
+        )
+      )
+    ));
+
+    // Local storage fallbacks while backend endpoints are being added
+    const local = {
+      get(key, def) { try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; } },
+      set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+    };
+
+    function SheetSetApp() {
+      const [projects, setProjects] = useState([]);
+      const [selectedProject, setSelectedProject] = useState('');
+      const [sheetSets, setSheetSets] = useState([]);
+      const [selectedSetId, setSelectedSetId] = useState('');
+      const [sheets, setSheets] = useState([]);
+      const [stats, setStats] = useState({ totalSets: 0, totalSheets: 0 });
+      const [loading, setLoading] = useState(true);
+      const [showNewSet, setShowNewSet] = useState(false);
+      const [newSet, setNewSet] = useState({ set_name: '', description: '', phase: '', discipline: '', status: 'Draft' });
+
+      // Phase C state
+      const [selectedSheetId, setSelectedSheetId] = useState('');
+      const [showAssign, setShowAssign] = useState(false);
+      const [assignments, setAssignments] = useState([]);
+      const [drawings, setDrawings] = useState([]);
+      const [assignForm, setAssignForm] = useState({ drawing_id: '', layout_name: '', assigned_by: '', notes: '' });
+
+      const [showRevisions, setShowRevisions] = useState(false);
+      const [revisions, setRevisions] = useState([]);
+      const [revForm, setRevForm] = useState({ revision_number: '', revision_date: '', description: '', revised_by: '', reference_number: '' });
+
+      const [showRelations, setShowRelations] = useState(false);
+      const [relationships, setRelationships] = useState([]);
+      const [relForm, setRelForm] = useState({ relationship_type: 'references', target_sheet_id: '', notes: '' });
+
+      const [showIndex, setShowIndex] = useState(false);
+      const [sheetIndex, setSheetIndex] = useState({ set_id: '', sheets: [], total_sheets: 0 });
+
+      useEffect(() => { init(); }, []);
+
+      async function init() {
+        try { const p = await API.list('/projects'); setProjects(p || []); } catch {}
+        // bootstrap local lists
+        setSheetSets(local.get('sheet_sets', []));
+        setLoading(false);
+      }
+
+      function calculateStats() {
+        setStats({ totalSets: (sheetSets || []).length, totalSheets: (sheets || []).length });
+      }
+      useEffect(() => { calculateStats(); }, [sheetSets, sheets]);
+
+      async function loadSheetSets(projectId) {
+        setSelectedSetId(''); setSheets([]);
+        try {
+          const res = await API.list('/sheet-sets', { project_id: projectId });
+          const sets = res.sheet_sets || res || [];
+          setSheetSets(sets);
+        } catch {
+          const all = local.get('sheet_sets', []);
+          setSheetSets(all.filter(s => s.project_id === projectId));
+        }
+      }
+
+      async function loadSheets(setId) {
+        try {
+          const res = await API.list('/sheets', { set_id: setId });
+          setSheets(res.sheets || res || []);
+        } catch {
+          const all = local.get('sheets', []);
+          setSheets(all.filter(s => s.set_id === setId));
+        }
+      }
+
+      // --- Assignments UI helpers ---
+      async function openAssignModal(sheetId) {
+        setSelectedSheetId(sheetId);
+        // load assignments for sheet
+        try {
+          const res = await API.list('/sheet-drawing-assignments', { sheet_id: sheetId });
+          setAssignments(res.assignments || res || []);
+        } catch { setAssignments([]); }
+        // load drawings for project
+        try {
+          const res = await API.request('GET', `/projects/${encodeURIComponent(selectedProject)}/drawings`);
+          setDrawings(res || []);
+        } catch { setDrawings([]); }
+        setAssignForm({ drawing_id: '', layout_name: '', assigned_by: '', notes: '' });
+        setShowAssign(true);
+      }
+
+      async function addAssignment() {
+        if (!selectedSheetId || !assignForm.drawing_id) return;
+        const payload = { sheet_id: selectedSheetId, drawing_id: assignForm.drawing_id, layout_name: assignForm.layout_name || null, assigned_by: assignForm.assigned_by || null, notes: assignForm.notes || null };
+        try {
+          const res = await API.create('/sheet-drawing-assignments', payload);
+          const saved = res.assignment || res;
+          setAssignments([saved, ...assignments]);
+          setAssignForm({ drawing_id: '', layout_name: '', assigned_by: '', notes: '' });
+        } catch (e) { alert('Failed to create assignment'); }
+      }
+
+      async function removeAssignment(assignmentId) {
+        try { await API.delete('/sheet-drawing-assignments', assignmentId); setAssignments(assignments.filter(a => a.assignment_id !== assignmentId)); }
+        catch { alert('Failed to delete assignment'); }
+      }
+
+      // --- Revisions UI helpers ---
+      async function openRevisionsModal(sheetId) {
+        setSelectedSheetId(sheetId);
+        try {
+          const res = await API.list('/sheet-revisions', { sheet_id: sheetId });
+          setRevisions(res.revisions || res || []);
+        } catch { setRevisions([]); }
+        setRevForm({ revision_number: '', revision_date: '', description: '', revised_by: '', reference_number: '' });
+        setShowRevisions(true);
+      }
+
+      async function addRevision() {
+        if (!selectedSheetId || !revForm.revision_number || !revForm.revision_date) return;
+        const payload = { sheet_id: selectedSheetId, revision_number: revForm.revision_number, revision_date: revForm.revision_date, description: revForm.description || null, revised_by: revForm.revised_by || null, reference_number: revForm.reference_number || null };
+        try {
+          const res = await API.create('/sheet-revisions', payload);
+          const saved = res.revision || res;
+          setRevisions([saved, ...revisions]);
+          setRevForm({ revision_number: '', revision_date: '', description: '', revised_by: '', reference_number: '' });
+          // Update the sheet's current revision fields for table display
+          try {
+            await API.update('/sheets', selectedSheetId, { revision_number: saved.revision_number, revision_date: saved.revision_date });
+            setSheets((sheets || []).map(s => s.sheet_id === selectedSheetId ? { ...s, revision_number: saved.revision_number, revision_date: saved.revision_date } : s));
+          } catch {}
+        } catch { alert('Failed to add revision'); }
+      }
+
+      // --- Relationships UI helpers ---
+      async function openRelationshipsModal(sheetId) {
+        setSelectedSheetId(sheetId);
+        try {
+          const res = await API.list('/sheet-relationships', { sheet_id: sheetId });
+          setRelationships(res.relationships || res || []);
+        } catch { setRelationships([]); }
+        setRelForm({ relationship_type: 'references', target_sheet_id: '', notes: '' });
+        setShowRelations(true);
+      }
+
+      async function addRelationship() {
+        if (!selectedSheetId || !relForm.relationship_type || !relForm.target_sheet_id) return;
+        const payload = { source_sheet_id: selectedSheetId, target_sheet_id: relForm.target_sheet_id, relationship_type: relForm.relationship_type, notes: relForm.notes || null };
+        try {
+          const res = await API.create('/sheet-relationships', payload);
+          const saved = res.relationship || res;
+          setRelationships([saved, ...relationships]);
+          setRelForm({ relationship_type: 'references', target_sheet_id: '', notes: '' });
+        } catch { alert('Failed to add relationship'); }
+      }
+
+      async function removeRelationship(relationshipId) {
+        try { await API.delete('/sheet-relationships', relationshipId); setRelationships(relationships.filter(r => r.relationship_id !== relationshipId)); }
+        catch { alert('Failed to delete relationship'); }
+      }
+
+      // --- Sheet Index ---
+      async function openIndexModal() {
+        if (!selectedSetId) return;
+        try {
+          const res = await API.read('/sheet-index', selectedSetId);
+          setSheetIndex(res || { set_id: selectedSetId, sheets: [], total_sheets: 0 });
+          setShowIndex(true);
+        } catch { alert('Failed to generate sheet index'); }
+      }
+
+      async function createSheetSet() {
+        if (!selectedProject || !newSet.set_name) return;
+        const payload = { ...newSet, project_id: selectedProject };
+        try {
+          const res = await API.create('/sheet-sets', payload);
+          const saved = res.sheet_set || res.set || res;
+          setSheetSets([saved, ...sheetSets]);
+          setShowNewSet(false); setNewSet({ set_name: '', description: '', phase: '', discipline: '', status: 'Draft' });
+        } catch {
+          const localSet = { ...payload, set_id: crypto.randomUUID(), created_at: new Date().toISOString() };
+          const all = local.get('sheet_sets', []); all.push(localSet); local.set('sheet_sets', all);
+          setSheetSets([localSet, ...sheetSets]);
+          setShowNewSet(false); setNewSet({ set_name: '', description: '', phase: '', discipline: '', status: 'Draft' });
+        }
+      }
+
+      async function deleteSet(setId) {
+        if (!confirm('Delete this sheet set and all its sheets?')) return;
+        try { await API.delete('/sheet-sets', setId); setSheetSets(sheetSets.filter(s => s.set_id !== setId)); }
+        catch {
+          const all = local.get('sheet_sets', []).filter(s => s.set_id !== setId); local.set('sheet_sets', all); setSheetSets(all);
+          const sheetsAll = local.get('sheets', []).filter(s => s.set_id !== setId); local.set('sheets', sheetsAll);
+        }
+        if (selectedSetId === setId) { setSelectedSetId(''); setSheets([]); }
+      }
+
+      async function createSheet() {
+        if (!selectedSetId) return;
+        const sheet_code = prompt('Sheet Code (e.g., C-1.1)'); if (!sheet_code) return;
+        const sheet_title = prompt('Sheet Title (e.g., Site Plan)'); if (!sheet_title) return;
+        const payload = { set_id: selectedSetId, sheet_code, sheet_title, sheet_hierarchy_number: 50, revision_number: 0 };
+        try { const res = await API.create('/sheets', payload); const saved = res.sheet || res; setSheets([...(sheets||[]), saved]); }
+        catch {
+          const localSheet = { ...payload, sheet_id: crypto.randomUUID(), sheet_number: (sheets?.length||0) + 1 };
+          const all = local.get('sheets', []); all.push(localSheet); local.set('sheets', all);
+          setSheets([...(sheets||[]), localSheet]);
+        }
+      }
+
+      async function editSheet(sheetId) {
+        const target = sheets.find(s => s.sheet_id === sheetId); if (!target) return;
+        const newCode = prompt('New Sheet Code', target.sheet_code); if (!newCode) return;
+        const newTitle = prompt('New Title', target.sheet_title); if (newTitle == null) return;
+        const patch = { sheet_code: newCode, sheet_title: newTitle };
+        try { await API.update('/sheets', sheetId, patch); setSheets(sheets.map(s => s.sheet_id===sheetId? { ...s, ...patch }: s)); }
+        catch {
+          const all = local.get('sheets', []).map(s => s.sheet_id===sheetId? { ...s, ...patch }: s); local.set('sheets', all);
+          setSheets(all.filter(s => s.set_id === selectedSetId));
+        }
+      }
+
+      async function deleteSheet(sheetId) {
+        if (!confirm('Delete this sheet?')) return;
+        try { await API.delete('/sheets', sheetId); setSheets(sheets.filter(s => s.sheet_id !== sheetId)); }
+        catch {
+          const all = local.get('sheets', []).filter(s => s.sheet_id !== sheetId); local.set('sheets', all); setSheets(all.filter(s => s.set_id === selectedSetId));
+        }
+      }
+
+      function renderSetItem(set) {
+        return React.createElement('div', { key: set.set_id, className: 'set-card', onClick: () => { setSelectedSetId(set.set_id); loadSheets(set.set_id); } },
+          React.createElement('div', { className: 'flex justify-between items-center' },
+            React.createElement('div', null,
+              React.createElement('div', { style: { fontWeight:700 } }, set.set_name),
+              React.createElement('div', { className: 'muted' }, set.phase || set.status || '')
+            ),
+            React.createElement('div', null,
+              React.createElement('span', { className: 'badge' }, `${set.sheet_count || 0} sheets`),
+              React.createElement('button', { className: 'btn btn-ghost btn-sm', title: 'Delete', onClick: (e) => { e.stopPropagation(); deleteSet(set.set_id); } },
+                React.createElement('i', { className: 'fas fa-trash' })
+              )
+            )
+          )
+        );
+      }
+
+      function renderSheetRow(s) {
+        return React.createElement('tr', { key: s.sheet_id },
+          React.createElement('td', null, s.sheet_number || ''),
+          React.createElement('td', null, s.sheet_code || ''),
+          React.createElement('td', null, s.sheet_title || ''),
+          React.createElement('td', null, s.sheet_category || ''),
+          React.createElement('td', null, s.revision_number ?? 0),
+          React.createElement('td', null,
+            React.createElement('div', { className: 'flex gap-sm' },
+              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => editSheet(s.sheet_id) }, React.createElement('i', { className: 'fas fa-pen' }), ' Edit'),
+              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => openAssignModal(s.sheet_id) }, React.createElement('i', { className: 'fas fa-link' }), ' Assign'),
+              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => openRevisionsModal(s.sheet_id) }, React.createElement('i', { className: 'fas fa-clock' }), ' Revisions'),
+              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => openRelationshipsModal(s.sheet_id) }, React.createElement('i', { className: 'fas fa-share-nodes' }), ' Relate'),
+              React.createElement('button', { className: 'btn btn-ghost btn-sm', onClick: () => deleteSheet(s.sheet_id) }, React.createElement('i', { className: 'fas fa-trash' }))
+            )
+          )
+        );
+      }
+
+      return (
+        React.createElement('div', { className: 'page-wrapper' },
+          React.createElement(Header, { title: 'Sheet Set Manager', subtitle: 'Organize deliverables and sheets' }),
+          React.createElement('main', { className: 'main-content' },
+            React.createElement('div', { className: 'container' },
+              React.createElement('div', { className: 'card' },
+                React.createElement('div', { className: 'card-header' },
+                  React.createElement('div', { className: 'topbar' },
+                    React.createElement('select', {
+                      className: 'form-select', value: selectedProject, onChange: (e) => { const v=e.target.value; setSelectedProject(v); if(v) loadSheetSets(v); }
+                    },
+                      React.createElement('option', { value: '' }, 'Select project...'),
+                      projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_name}${p.project_number? ' ('+p.project_number+')':''}`))
+                    ),
+                    React.createElement('button', { className: 'btn btn-primary', disabled: !selectedProject, onClick: () => setShowNewSet(true) },
+                      React.createElement('i', { className: 'fas fa-plus' }), ' Create Set'
+                    ),
+                    React.createElement('div', { className: 'ml-auto flex gap-sm' },
+                      React.createElement('span', { className: 'badge' }, `Sets: ${stats.totalSets}`),
+                      React.createElement('span', { className: 'badge' }, `Sheets: ${stats.totalSheets}`)
+                    )
+                  )
+                ),
+
+                loading ? React.createElement('div', { className: 'p-md' }, 'Loading...') : (
+                  React.createElement('div', { className: 'p-md two-col' },
+                    // Left panel: Sheet Sets
+                    React.createElement('div', { className: 'panel' },
+                      React.createElement('div', { className: 'panel-header' },
+                        React.createElement('div', { className: 'panel-title' }, 'Sheet Sets'),
+                        React.createElement('div', { className: 'muted' }, selectedProject ? '' : 'Select a project')
+                      ),
+                      React.createElement('div', { className: 'list' },
+                        (sheetSets || []).length === 0 ? React.createElement('div', { className: 'muted' }, 'No sets') : sheetSets.map(renderSetItem)
+                      )
+                    ),
+
+                    // Right panel: Sheets Table
+                    React.createElement('div', { className: 'panel' },
+                      React.createElement('div', { className: 'panel-header' },
+                        React.createElement('div', { className: 'panel-title' }, 'Sheets'),
+                        React.createElement('div', { className: 'flex gap-sm' },
+                          React.createElement('button', { className: 'btn btn-primary btn-sm', disabled: !selectedSetId, onClick: createSheet },
+                            React.createElement('i', { className: 'fas fa-plus' }), ' Add Sheet'),
+                          React.createElement('button', { className: 'btn btn-secondary btn-sm', disabled: !selectedSetId, onClick: openIndexModal },
+                            React.createElement('i', { className: 'fas fa-list' }), ' Generate Index')
+                        )
+                      ),
+                      React.createElement('div', { className: 'list', style: { padding: 0 } },
+                        React.createElement('table', { className: 'datatable' },
+                          React.createElement('thead', null,
+                            React.createElement('tr', null,
+                              React.createElement('th', null, '#'),
+                              React.createElement('th', null, 'Code'),
+                              React.createElement('th', null, 'Title'),
+                              React.createElement('th', null, 'Category'),
+                              React.createElement('th', null, 'Rev'),
+                              React.createElement('th', { style: { width: '140px' } }, 'Actions')
+                            )
+                          ),
+                          React.createElement('tbody', null,
+                            (sheets || []).length === 0 ? React.createElement('tr', null, React.createElement('td', { colSpan: 6, style: { padding: '20px', textAlign: 'center', color: 'var(--color-text-secondary)' } }, 'No sheets in this set')) :
+                            sheets.map(renderSheetRow)
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          ),
+
+          // Create Set modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children, footer }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children), React.createElement('div', { className: 'modal-footer' }, footer))) : null; }), {
+            isOpen: showNewSet,
+            onClose: () => setShowNewSet(false),
+            title: 'Create Sheet Set',
+            footer: React.createElement('div', { className: 'flex gap-sm justify-end' },
+              React.createElement('button', { className: 'btn', onClick: () => setShowNewSet(false) }, 'Cancel'),
+              React.createElement('button', { className: 'btn btn-primary', onClick: createSheetSet, disabled: !selectedProject || !newSet.set_name }, 'Create')
+            )
+          },
+            React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Set Name'),
+                React.createElement('input', { className: 'form-input', value: newSet.set_name, onChange: e => setNewSet({ ...newSet, set_name: e.target.value }), placeholder: 'e.g., 100% Civil Plans' })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Description'),
+                React.createElement('textarea', { className: 'form-input', rows: 3, value: newSet.description, onChange: e => setNewSet({ ...newSet, description: e.target.value }) })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Phase'),
+                React.createElement('input', { className: 'form-input', value: newSet.phase, onChange: e => setNewSet({ ...newSet, phase: e.target.value }), placeholder: 'e.g., Construction Documents' })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Discipline'),
+                React.createElement('input', { className: 'form-input', value: newSet.discipline, onChange: e => setNewSet({ ...newSet, discipline: e.target.value }), placeholder: 'Civil' })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Status'),
+                React.createElement('select', { className: 'form-select', value: newSet.status, onChange: e => setNewSet({ ...newSet, status: e.target.value }) },
+                  React.createElement('option', { value: 'Draft' }, 'Draft'),
+                  React.createElement('option', { value: 'In Review' }, 'In Review'),
+                  React.createElement('option', { value: 'Issued for Permit' }, 'Issued for Permit'),
+                  React.createElement('option', { value: 'Issued for Construction' }, 'Issued for Construction')
+                )
+              )
+            )
+          ),
+
+          // Assign Drawing modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children, footer }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children), React.createElement('div', { className: 'modal-footer' }, footer))) : null; }), {
+            isOpen: showAssign,
+            onClose: () => setShowAssign(false),
+            title: 'Assign Drawing to Sheet',
+            footer: React.createElement('div', { className: 'flex gap-sm justify-end' },
+              React.createElement('button', { className: 'btn', onClick: () => setShowAssign(false) }, 'Close'),
+              React.createElement('button', { className: 'btn btn-primary', onClick: addAssignment, disabled: !assignForm.drawing_id }, 'Add Assignment')
+            )
+          },
+            React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Drawing'),
+                React.createElement('select', { className: 'form-select', value: assignForm.drawing_id, onChange: e => setAssignForm({ ...assignForm, drawing_id: e.target.value }) },
+                  React.createElement('option', { value: '' }, 'Select drawing...'),
+                  drawings.map(d => React.createElement('option', { key: d.drawing_id, value: d.drawing_id }, `${d.drawing_number || ''} ${d.drawing_name || ''}`))
+                )
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Layout Name'),
+                React.createElement('input', { className: 'form-input', value: assignForm.layout_name, onChange: e => setAssignForm({ ...assignForm, layout_name: e.target.value }), placeholder: 'e.g., Sheet C-1.1' })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Assigned By'),
+                React.createElement('input', { className: 'form-input', value: assignForm.assigned_by, onChange: e => setAssignForm({ ...assignForm, assigned_by: e.target.value }), placeholder: 'Name' })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Notes'),
+                React.createElement('textarea', { className: 'form-input', rows: 2, value: assignForm.notes, onChange: e => setAssignForm({ ...assignForm, notes: e.target.value }) })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('div', { className: 'muted' }, 'Existing Assignments')
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                assignments.length === 0 ? React.createElement('div', { className: 'muted' }, 'None') : assignments.map(a => (
+                  React.createElement('div', { key: a.assignment_id, className: 'set-card' },
+                    React.createElement('div', null, `${a.drawing_name || a.drawing_id} — ${a.layout_name || ''}`),
+                    React.createElement('div', { className: 'muted' }, `Assigned ${a.assigned_by || ''} @ ${a.assigned_at || ''}`),
+                    React.createElement('div', null, React.createElement('button', { className: 'btn btn-ghost btn-sm', onClick: () => removeAssignment(a.assignment_id) }, React.createElement('i', { className: 'fas fa-trash' }), ' Remove'))
+                  )
+                ))
+              )
+            )
+          ),
+
+          // Revisions modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children, footer }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children), React.createElement('div', { className: 'modal-footer' }, footer))) : null; }), {
+            isOpen: showRevisions,
+            onClose: () => setShowRevisions(false),
+            title: 'Sheet Revisions',
+            footer: React.createElement('div', { className: 'flex gap-sm justify-end' },
+              React.createElement('button', { className: 'btn', onClick: () => setShowRevisions(false) }, 'Close'),
+              React.createElement('button', { className: 'btn btn-primary', onClick: addRevision, disabled: !revForm.revision_number || !revForm.revision_date }, 'Add Revision')
+            )
+          },
+            React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Revision #'),
+                React.createElement('input', { className: 'form-input', value: revForm.revision_number, onChange: e => setRevForm({ ...revForm, revision_number: e.target.value }), placeholder: 'e.g., 1 or A' })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Revision Date'),
+                React.createElement('input', { className: 'form-input', type: 'date', value: revForm.revision_date, onChange: e => setRevForm({ ...revForm, revision_date: e.target.value }) })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Description'),
+                React.createElement('textarea', { className: 'form-input', rows: 2, value: revForm.description, onChange: e => setRevForm({ ...revForm, description: e.target.value }) })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Revised By'),
+                React.createElement('input', { className: 'form-input', value: revForm.revised_by, onChange: e => setRevForm({ ...revForm, revised_by: e.target.value }) })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Reference #'),
+                React.createElement('input', { className: 'form-input', value: revForm.reference_number, onChange: e => setRevForm({ ...revForm, reference_number: e.target.value }) })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('div', { className: 'muted' }, 'History')
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                revisions.length === 0 ? React.createElement('div', { className: 'muted' }, 'No revisions') :
+                revisions.map(r => (
+                  React.createElement('div', { key: r.revision_id, className: 'set-card' },
+                    React.createElement('div', null, `${r.revision_number} — ${r.revision_date || ''}`),
+                    React.createElement('div', { className: 'muted' }, r.description || '')
+                  )
+                ))
+              )
+            )
+          ),
+
+          // Relationships modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children, footer }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children), React.createElement('div', { className: 'modal-footer' }, footer))) : null; }), {
+            isOpen: showRelations,
+            onClose: () => setShowRelations(false),
+            title: 'Sheet Relationships',
+            footer: React.createElement('div', { className: 'flex gap-sm justify-end' },
+              React.createElement('button', { className: 'btn', onClick: () => setShowRelations(false) }, 'Close'),
+              React.createElement('button', { className: 'btn btn-primary', onClick: addRelationship, disabled: !relForm.relationship_type || !relForm.target_sheet_id }, 'Add Relationship')
+            )
+          },
+            React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Relationship Type'),
+                React.createElement('select', { className: 'form-select', value: relForm.relationship_type, onChange: e => setRelForm({ ...relForm, relationship_type: e.target.value }) },
+                  React.createElement('option', { value: 'references' }, 'references'),
+                  React.createElement('option', { value: 'detail_of' }, 'detail_of'),
+                  React.createElement('option', { value: 'continued_from' }, 'continued_from'),
+                  React.createElement('option', { value: 'see_also' }, 'see_also')
+                )
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Target Sheet'),
+                React.createElement('select', { className: 'form-select', value: relForm.target_sheet_id, onChange: e => setRelForm({ ...relForm, target_sheet_id: e.target.value }) },
+                  React.createElement('option', { value: '' }, 'Select sheet...'),
+                  sheets.filter(s => s.sheet_id !== selectedSheetId).map(s => React.createElement('option', { key: s.sheet_id, value: s.sheet_id }, `${s.sheet_code || ''} — ${s.sheet_title || ''}`))
+                )
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Notes'),
+                React.createElement('textarea', { className: 'form-input', rows: 2, value: relForm.notes, onChange: e => setRelForm({ ...relForm, notes: e.target.value }) })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('div', { className: 'muted' }, 'Existing Relationships')
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                relationships.length === 0 ? React.createElement('div', { className: 'muted' }, 'None') : relationships.map(r => (
+                  React.createElement('div', { key: r.relationship_id, className: 'set-card' },
+                    React.createElement('div', null, `${r.relationship_type} — ${r.target_sheet_code || r.target_sheet_id || ''}`),
+                    React.createElement('div', { className: 'muted' }, r.notes || ''),
+                    React.createElement('div', null, React.createElement('button', { className: 'btn btn-ghost btn-sm', onClick: () => removeRelationship(r.relationship_id) }, React.createElement('i', { className: 'fas fa-trash' }), ' Remove'))
+                  )
+                ))
+              )
+            )
+          ),
+
+          // Sheet Index modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children))) : null; }), {
+            isOpen: showIndex,
+            onClose: () => setShowIndex(false),
+            title: 'Sheet Index'
+          },
+            React.createElement('div', { className: 'list' },
+              (sheetIndex.sheets || []).length === 0 ? React.createElement('div', { className: 'muted' }, 'No sheets') :
+              React.createElement('table', { className: 'datatable' },
+                React.createElement('thead', null,
+                  React.createElement('tr', null,
+                    React.createElement('th', null, '#'),
+                    React.createElement('th', null, 'Code'),
+                    React.createElement('th', null, 'Title'),
+                    React.createElement('th', null, 'Scale'),
+                    React.createElement('th', null, 'Rev'),
+                    React.createElement('th', null, 'Rev Date')
+                  )
+                ),
+                React.createElement('tbody', null,
+                  sheetIndex.sheets.map(it => (
+                    React.createElement('tr', { key: (it.sheet_number || '') + (it.sheet_code || '') },
+                      React.createElement('td', null, it.sheet_number || ''),
+                      React.createElement('td', null, it.sheet_code || ''),
+                      React.createElement('td', null, it.sheet_title || ''),
+                      React.createElement('td', null, it.scale || ''),
+                      React.createElement('td', null, it.revision_number ?? 0),
+                      React.createElement('td', null, it.revision_date || '')
+                    )
+                  ))
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(SheetSetApp));
+  </script>
+</body>
+</html>

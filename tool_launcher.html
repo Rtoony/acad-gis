@@ -249,11 +249,11 @@
                 badge: 'Core'
             },
             {
-                id: 'drawing-browser',
-                name: 'Drawing Browser',
-                description: 'Search, filter, and browse all drawings. Quick access to view and manage drawing files.',
-                icon: 'search',
-                url: 'frontend/tools/drawing_browser.html',
+                id: 'drawings-manager',
+                name: 'Drawings Manager',
+                description: 'Manage drawings: search, filter, edit metadata, and upload DXF with GEO support.',
+                icon: 'drafting-compass',
+                url: 'frontend/tools/drawings-manager.html',
                 color: 'green',
                 badge: 'Core'
             },
@@ -332,10 +332,19 @@
             {
                 id: 'sheet-note-manager',
                 name: 'Sheet Note Manager',
-                description: 'Maintain standardized sheet notes.',
+                description: 'Maintain company notes, project note sets, and assignments.',
                 icon: 'note-sticky',
                 url: 'frontend/tools/sheet-note-manager.html',
                 color: 'gray',
+                badge: 'Updated'
+            },
+            {
+                id: 'sheet-set-manager',
+                name: 'Sheet Set Manager',
+                description: 'Organize deliverable packages and manage sheets with revisions.',
+                icon: 'folder-tree',
+                url: 'frontend/tools/sheet-set-manager.html',
+                color: 'blue',
                 badge: 'New'
             }
         ];
@@ -516,8 +525,8 @@
                                                     <button className="btn btn-secondary" onClick={() => openTool('frontend/tools/drawing-importer.html')} style={{ justifyContent: 'flex-start' }}>
                                                         <i className="fas fa-file-upload"></i> Import Drawing
                                                     </button>
-                                                    <button className="btn btn-secondary" onClick={() => openTool('frontend/tools/drawing_browser.html')} style={{ justifyContent: 'flex-start' }}>
-                                                        <i className="fas fa-search"></i> Browse Drawings
+                                                    <button className="btn btn-secondary" onClick={() => openTool('frontend/tools/drawings-manager.html')} style={{ justifyContent: 'flex-start' }}>
+                                                        <i className="fas fa-drafting-compass"></i> Open Drawings Manager
                                                     </button>
                                                 </div>
                                             </div>

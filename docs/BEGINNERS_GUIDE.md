@@ -25,7 +25,7 @@ ACAD‑GIS is a web-based system for managing CAD drawings with GIS context. The
 - FastAPI server with health (`/api/health`) and stats (`/api/stats`).
 - Project and drawing endpoints (basic CRUD patterns present).
 - DXF import/export stubs.
-- Frontend: Tool Launcher, Project Manager, Drawing Browser, Map Viewer.
+- Frontend: Tool Launcher, Project Manager, Drawings Manager, Map Viewer.
 - Civil tools (beta): Pipe Network Editor, Alignment Editor, BMP Manager, Utility Coordination, Plot & Profile Manager, Sheet Note Manager. They read from the new civil tables and expose basic CRUD + GeoJSON endpoints (some advanced actions still roadmap items).
 
 ## Where Things Live (Repo Map)
@@ -47,7 +47,7 @@ ACAD‑GIS is a web-based system for managing CAD drawings with GIS context. The
 
 3) Try a few tools
 - Project Manager: `frontend/tools/project-manager.html`
-- Drawing Browser: `frontend/tools/drawing-browser.html`
+- Drawings Manager: `frontend/tools/drawings-manager.html`
 - Map Viewer: `frontend/tools/map_viewer.html`
 - Civil (mocked): `pipe-network-editor.html`, `alignment-editor.html`, `bmp-manager.html`, `utility-coordination.html`, `plot-profile-manager.html`, `sheet-note-manager.html`
 
@@ -91,5 +91,4 @@ Tip: You can also launch tools from the cards in `tool_launcher.html`.
 - Civil tools load and show tables (data is mocked for now).
 
 You’re ready to explore. When the schema is finalized, we’ll flip the stubs to real endpoints and wire the tools to the database.
-
 

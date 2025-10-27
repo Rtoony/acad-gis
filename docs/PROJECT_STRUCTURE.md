@@ -26,7 +26,7 @@ acad-gis/
 - `api.js`, `state.js`, `dev-tools.js` — enhanced helpers
 
 `frontend/tools/` contains single-file HTML tools (React via CDN + Babel):
-- `project-manager.html`, `drawing_browser.html`, `drawing-importer.html`, `map_viewer.html`
+- `project-manager.html`, `drawings-manager.html`, `drawing-importer.html`, `map_viewer.html`
 
 ## Backend
 - `backend/api_server.py` - FastAPI app and endpoints

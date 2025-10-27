@@ -9,6 +9,18 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    .three-col { display:grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 16px; }
+    .panel { background: linear-gradient(135deg, rgba(30,41,59,0.6), rgba(15,23,42,0.85)); border:1px solid rgba(59,130,246,0.25); border-radius: 10px; overflow:hidden; }
+    .panel-header { display:flex; justify-content:space-between; align-items:center; padding: 10px 14px; border-bottom:1px solid rgba(59,130,246,0.2); }
+    .panel-title { font-weight:700; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.7rem; border:1px solid rgba(59,130,246,0.3); color:#93c5fd; background:rgba(59,130,246,0.15); margin-left:6px; }
+    .note-card { border:1px solid rgba(148,163,184,0.25); border-radius:8px; padding:10px; margin-bottom:10px; background: rgba(2,6,23,0.35); }
+    .note-title { font-weight:700; }
+    .muted { color: var(--color-text-secondary); font-size: 0.85rem; }
+    .list { padding: 10px 14px; max-height: calc(100vh - 290px); overflow:auto; }
+    .topbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  </style>
 </head>
 <body class="grid-background">
   <div id="root"></div>
@@ -19,60 +31,354 @@
 
   <script type="text/babel">
     const { useEffect, useState } = React;
+    const Header = window.Header || (({ title, subtitle, right }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', { className:'orbitron' }, title || 'Sheet Note Manager'),
+            React.createElement('div', { className: 'header-subtitle' }, subtitle || 'Standardized notes across sheets')
+          ),
+          right || React.createElement(window.ApiStatus || (()=>React.createElement('div', null)), null)
+        )
+      )
+    ));
 
-    function SheetNoteManager() {
-      const [notes, setNotes] = useState([]);
+    // Fallback local storage helpers for when backend endpoints aren\'t ready
+    const local = {
+      get(key, def) { try { return JSON.parse(localStorage.getItem(key)) ?? def; } catch { return def; } },
+      set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+    };
+
+    // 10 sample standard notes
+    const SAMPLE_STANDARD_NOTES = [
+      { note_id: 1, note_category: 'General', note_title: 'Verify Dimensions', note_text: 'All dimensions to be verified in field prior to construction.', discipline: 'Civil' },
+      { note_id: 2, note_category: 'Grading', note_title: 'Grading Plan', note_text: 'All grading to conform to approved drainage plan.', discipline: 'Civil' },
+      { note_id: 3, note_category: 'Utilities', note_title: 'Utility Coordination', note_text: 'Coordinate with all utility providers prior to construction.', discipline: 'Civil' },
+      { note_id: 4, note_category: 'Demolition', note_title: 'Demolition Note', note_text: 'Verify all existing utilities before demolition.', discipline: 'Civil' },
+      { note_id: 5, note_category: 'Erosion Control', note_title: 'SWPPP Compliance', note_text: 'Contractor to maintain SWPPP compliance at all times.', discipline: 'Civil' },
+      { note_id: 6, note_category: 'Paving', note_title: 'Paving Standards', note_text: 'All paving to meet jurisdiction standards.', discipline: 'Civil' },
+      { note_id: 7, note_category: 'Profiles', note_title: 'Profile Data', note_text: 'Profiles to be based on latest survey benchmarks.', discipline: 'Civil' },
+      { note_id: 8, note_category: 'Details', note_title: 'Standard Details', note_text: 'Use latest approved standard details unless noted otherwise.', discipline: 'Civil' },
+      { note_id: 9, note_category: 'Landscape', note_title: 'Irrigation', note_text: 'Irrigation system to comply with water efficiency standards.', discipline: 'Landscape' },
+      { note_id: 10, note_category: 'General', note_title: 'Site Access', note_text: 'Maintain site access and safety at all times.', discipline: 'Civil' },
+    ];
+
+    function SheetNoteApp() {
+      const [projects, setProjects] = useState([]);
+      const [selectedProject, setSelectedProject] = useState('');
+      const [noteSets, setNoteSets] = useState([]);
+      const [selectedNoteSet, setSelectedNoteSet] = useState('');
+      const [projectNotes, setProjectNotes] = useState([]);
+      const [assignments, setAssignments] = useState([]);
+      const [standardNotes, setStandardNotes] = useState(SAMPLE_STANDARD_NOTES);
+      const [stats, setStats] = useState({ totalSets: 0, totalNotes: 0, totalAssignments: 0 });
       const [loading, setLoading] = useState(true);
+      const [searchStd, setSearchStd] = useState('');
+      const [filters, setFilters] = useState({ category: '', discipline: '' });
       const [error, setError] = useState('');
+      const [showNewSet, setShowNewSet] = useState(false);
+      const [newSet, setNewSet] = useState({ set_name: '', description: '', discipline: '' });
 
-      const load = async () => {
-        setLoading(true); setError('');
-        try { const data = await API.list('/sheet-notes'); setNotes(data || []); }
-        catch (e) { setError(e.message || 'Failed to load notes'); }
-        finally { setLoading(false); }
-      };
+      useEffect(() => { init(); }, []);
 
-      useEffect(() => { load(); }, []);
+      async function init() {
+        try {
+          const p = await API.list('/projects');
+          setProjects(p || []);
+          // Load locally stored note sets if API not ready
+          const localSets = local.get('sheet_note_sets', []);
+          setNoteSets(localSets);
+          // Load standard notes from backend; fallback to samples
+          try {
+            const std = await API.list('/standard-notes');
+            setStandardNotes((std && (std.standard_notes || std)) || SAMPLE_STANDARD_NOTES);
+          } catch (e) {
+            setStandardNotes(SAMPLE_STANDARD_NOTES);
+          }
+        } catch (e) {
+          console.warn('Projects not available yet', e);
+        } finally {
+          setLoading(false);
+        }
+      }
 
-      const columns = [
-        { key: 'title', label: 'Title' },
-        { key: 'project_name', label: 'Project' },
-        { key: 'category', label: 'Category' },
-        { key: 'is_standard', label: 'Standard' },
-        { key: 'updated_at', label: 'Updated', format: 'date' }
-      ];
+      // Server-side filtering for standard notes with debounce on search
+      useEffect(() => {
+        let timer = setTimeout(async () => {
+          try {
+            const query = {};
+            if (filters.category) query.note_category = filters.category;
+            if (filters.discipline) query.discipline = filters.discipline;
+            if (searchStd) query.q = searchStd;
+            const res = await API.list('/standard-notes', query);
+            setStandardNotes((res && (res.standard_notes || res)) || []);
+          } catch (e) {
+            // keep current notes on failure
+          }
+        }, 250);
+        return () => clearTimeout(timer);
+      }, [filters, searchStd]);
+
+      function calculateStats() {
+        const totalSets = (noteSets || []).length;
+        const totalNotes = (projectNotes || []).length;
+        const totalAssignments = (assignments || []).length;
+        setStats({ totalSets, totalNotes, totalAssignments });
+      }
+      useEffect(() => { calculateStats(); }, [noteSets, projectNotes, assignments]);
+
+      async function loadNoteSets(projectId) {
+        setSelectedNoteSet('');
+        setProjectNotes([]);
+        setAssignments([]);
+        // Try API; fallback to local
+        try {
+          const res = await API.list('/sheet-note-sets', { project_id: projectId });
+          const sets = res.sets || res || [];
+          setNoteSets(sets);
+        } catch {
+          const all = local.get('sheet_note_sets', []);
+          setNoteSets(all.filter(s => s.project_id === projectId));
+        }
+      }
+
+      async function loadProjectNotes(setId) {
+        setProjectNotes([]); setAssignments([]);
+        try {
+          const res = await API.list('/project-sheet-notes', { set_id: setId });
+          setProjectNotes(res.notes || res || []);
+        } catch {
+          const all = local.get('project_sheet_notes', []);
+          setProjectNotes(all.filter(n => n.set_id === setId));
+        }
+      }
+
+      async function loadAssignmentsForNote(project_note_id) {
+        try {
+          const res = await API.list('/sheet-note-assignments', { project_note_id });
+          setAssignments(res.assignments || res || []);
+        } catch {
+          const all = local.get('sheet_note_assignments', []);
+          setAssignments(all.filter(a => a.project_note_id === project_note_id));
+        }
+      }
+
+      async function createNoteSet() {
+        if (!selectedProject || !newSet.set_name) return;
+        const payload = { ...newSet, project_id: selectedProject, is_active: false };
+        try {
+          const res = await API.create('/sheet-note-sets', payload);
+          const saved = res.set || res;
+          setNoteSets([saved, ...noteSets]);
+          setShowNewSet(false);
+          setNewSet({ set_name: '', description: '', discipline: '' });
+        } catch (e) {
+          // fallback local
+          const localSet = { ...payload, set_id: crypto.randomUUID(), created_at: new Date().toISOString() };
+          const all = local.get('sheet_note_sets', []);
+          all.push(localSet); local.set('sheet_note_sets', all);
+          setNoteSets([localSet, ...noteSets]);
+          setShowNewSet(false);
+          setNewSet({ set_name: '', description: '', discipline: '' });
+        }
+      }
+
+      async function addStandardToProject(note) {
+        if (!selectedNoteSet) return;
+        const payload = { set_id: selectedNoteSet, standard_note_id: note.note_id, display_code: '' };
+        try {
+          const res = await API.create('/project-sheet-notes', payload);
+          const saved = res.note || res;
+          setProjectNotes([...projectNotes, saved]);
+        } catch {
+          const localNote = {
+            project_note_id: crypto.randomUUID(), set_id: selectedNoteSet,
+            standard_note_id: note.note_id, display_code: '', custom_title: null, custom_text: null,
+            is_modified: false, sort_order: (projectNotes.length + 1), usage_count: 0
+          };
+          const all = local.get('project_sheet_notes', []); all.push(localNote); local.set('project_sheet_notes', all);
+          setProjectNotes([...projectNotes, localNote]);
+        }
+      }
+
+      async function addCustomNote() {
+        if (!selectedNoteSet) return;
+        const title = prompt('Custom note title');
+        if (!title) return;
+        const text = prompt('Custom note text');
+        if (text == null) return;
+        const payload = { set_id: selectedNoteSet, standard_note_id: null, display_code: '', custom_title: title, custom_text: text };
+        try {
+          const res = await API.create('/project-sheet-notes', payload);
+          const saved = res.note || res;
+          setProjectNotes([...projectNotes, saved]);
+        } catch {
+          const localNote = {
+            project_note_id: crypto.randomUUID(), set_id: selectedNoteSet,
+            standard_note_id: null, display_code: '', custom_title: title, custom_text: text,
+            is_modified: false, sort_order: (projectNotes.length + 1), usage_count: 0
+          };
+          const all = local.get('project_sheet_notes', []); all.push(localNote); local.set('project_sheet_notes', all);
+          setProjectNotes([...projectNotes, localNote]);
+        }
+      }
+
+      function renderBadge(note) {
+        if (!note) return null;
+        if (!note.standard_note_id) return React.createElement('span', { className: 'badge' }, 'Custom');
+        if (note.is_modified) return React.createElement('span', { className: 'badge' }, 'Modified');
+        return React.createElement('span', { className: 'badge' }, 'Standard');
+      }
+
+      function filteredStandardNotes() {
+        // Already filtered server-side; return as-is for responsiveness
+        return standardNotes || [];
+      }
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
-          React.createElement('header', { className: 'header' },
-            React.createElement('div', { className: 'header-content' },
-                React.createElement('div', { className: 'header-title' },
-                React.createElement('h1', null, 'Sheet Note Manager'),
-                React.createElement('div', { className: 'header-subtitle' }, 'Standardized notes across sheets')
-              )
-            )
-          ),
+          React.createElement(Header, { title: 'Sheet Note Manager', subtitle: 'Library, project sets, and assignments' }),
           React.createElement('main', { className: 'main-content' },
             React.createElement('div', { className: 'container' },
               React.createElement('div', { className: 'card' },
                 React.createElement('div', { className: 'card-header' },
-                  React.createElement('div', { className: 'card-title' }, 'Notes'),
-                  React.createElement('div', null,
-                    React.createElement('button', { className: 'btn btn-secondary', onClick: load },
-                      React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh')
+                  React.createElement('div', { className: 'topbar' },
+                    React.createElement('select', {
+                      className: 'form-select', value: selectedProject, onChange: (e) => { const v = e.target.value; setSelectedProject(v); if(v) loadNoteSets(v); }
+                    },
+                      React.createElement('option', { value: '' }, 'Select project...'),
+                      projects.map(p => React.createElement('option', { key: p.project_id, value: p.project_id }, `${p.project_name}${p.project_number ? ' ('+p.project_number+')' : ''}`))
+                    ),
+                    React.createElement('select', {
+                      className: 'form-select', disabled: !selectedProject || noteSets.length === 0, value: selectedNoteSet,
+                      onChange: (e) => { const v = e.target.value; setSelectedNoteSet(v); if(v) loadProjectNotes(v); }
+                    },
+                      React.createElement('option', { value: '' }, noteSets.length ? 'Select note set...' : 'No sets yet'),
+                      noteSets.map(s => React.createElement('option', { key: s.set_id, value: s.set_id }, `${s.set_name}${s.is_active ? ' (Active)' : ''}`))
+                    ),
+                    React.createElement('button', { className: 'btn btn-primary', disabled: !selectedProject, onClick: () => setShowNewSet(true) },
+                      React.createElement('i', { className: 'fas fa-plus' }), ' Create Note Set'
+                    ),
+                    React.createElement('div', { className: 'ml-auto flex gap-sm' },
+                      React.createElement('span', { className: 'badge' }, `Sets: ${stats.totalSets}`),
+                      React.createElement('span', { className: 'badge' }, `Notes: ${stats.totalNotes}`),
+                      React.createElement('span', { className: 'badge' }, `Assignments: ${stats.totalAssignments}`)
+                    )
                   )
                 ),
-                error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
-                loading
-                  ? React.createElement('div', { className: 'text-center p-lg' }, 'Loading...')
-                  : React.createElement(window.DataTable || (({ data }) => React.createElement('pre', null, JSON.stringify(data, null, 2))), {
-                      data: notes,
-                      columns,
-                      searchable: true,
-                      pagination: true,
-                      pageSize: 20,
-                      emptyMessage: 'No notes found'
-                    })
+
+                loading ? React.createElement('div', { className: 'p-md' }, 'Loading...') : (
+                  React.createElement('div', { className: 'p-md three-col' },
+                    // Left: Standard Notes Library
+                    React.createElement('div', { className: 'panel' },
+                      React.createElement('div', { className: 'panel-header' },
+                        React.createElement('div', { className: 'panel-title' }, 'Standard Notes Library'),
+                        React.createElement('div', { className: 'flex gap-sm items-center' },
+                          React.createElement('select', { className: 'form-select', value: filters.category, onChange: e => setFilters({ ...filters, category: e.target.value }) },
+                            React.createElement('option', { value: '' }, 'All Categories'),
+                            Array.from(new Set((standardNotes||[]).map(n => n.note_category).filter(Boolean))).map(c => (
+                              React.createElement('option', { key: c, value: c }, c)
+                            ))
+                          ),
+                          React.createElement('select', { className: 'form-select', value: filters.discipline, onChange: e => setFilters({ ...filters, discipline: e.target.value }) },
+                            React.createElement('option', { value: '' }, 'All Disciplines'),
+                            Array.from(new Set((standardNotes||[]).map(n => n.discipline).filter(Boolean))).map(d => (
+                              React.createElement('option', { key: d, value: d }, d)
+                            ))
+                          ),
+                          React.createElement('input', { className: 'form-input', placeholder: 'Search...', value: searchStd, onChange: e => setSearchStd(e.target.value) })
+                        )
+                      ),
+                      React.createElement('div', { className: 'list' },
+                        filteredStandardNotes().map(n => (
+                          React.createElement('div', { key: n.note_id, className: 'note-card' },
+                            React.createElement('div', { className: 'note-title' }, n.note_title,
+                              React.createElement('span', { className: 'badge' }, n.note_category)
+                            ),
+                            React.createElement('div', { className: 'muted' }, n.discipline || 'General'),
+                            React.createElement('div', { className: 'mt-sm' }, n.note_text),
+                            React.createElement('div', { className: 'mt-sm' },
+                              React.createElement('button', { className: 'btn btn-secondary btn-sm', disabled: !selectedNoteSet, onClick: () => addStandardToProject(n) },
+                                React.createElement('i', { className: 'fas fa-plus' }), ' Add to Set'
+                              )
+                            )
+                          )
+                        ))
+                      )
+                    ),
+
+                    // Center: Project Notes Editor
+                    React.createElement('div', { className: 'panel' },
+                      React.createElement('div', { className: 'panel-header' },
+                        React.createElement('div', { className: 'panel-title' }, 'Project Notes Editor'),
+                        React.createElement('div', null,
+                          React.createElement('button', { className: 'btn btn-primary btn-sm', disabled: !selectedNoteSet, onClick: addCustomNote },
+                            React.createElement('i', { className: 'fas fa-plus' }), ' Add Note'
+                          )
+                        )
+                      ),
+                      React.createElement('div', { className: 'list' },
+                        projectNotes.length === 0 ? React.createElement('div', { className: 'muted' }, 'No notes in this set yet') :
+                        projectNotes.map(n => (
+                          React.createElement('div', { key: n.project_note_id, className: 'note-card' },
+                            React.createElement('div', { className: 'note-title' }, n.custom_title || n.standard_title || '(Untitled)', ' ', renderBadge(n)),
+                            React.createElement('div', { className: 'muted' }, n.display_code || ''),
+                            React.createElement('div', { className: 'mt-sm' }, n.custom_text || n.standard_text || ''),
+                            React.createElement('div', { className: 'mt-sm flex gap-sm' },
+                              React.createElement('button', { className: 'btn btn-secondary btn-sm', onClick: () => loadAssignmentsForNote(n.project_note_id) },
+                                React.createElement('i', { className: 'fas fa-list' }), ' View Usage'
+                              )
+                            )
+                          )
+                        ))
+                      )
+                    ),
+
+                    // Right: Sheet Assignments
+                    React.createElement('div', { className: 'panel' },
+                      React.createElement('div', { className: 'panel-header' },
+                        React.createElement('div', { className: 'panel-title' }, 'Sheet Assignments'),
+                        React.createElement('div', { className: 'muted' }, 'Shows where selected note is used')
+                      ),
+                      React.createElement('div', { className: 'list' },
+                        assignments.length === 0 ? React.createElement('div', { className: 'muted' }, 'No assignments selected') :
+                        assignments.map(a => (
+                          React.createElement('div', { key: a.assignment_id, className: 'note-card' },
+                            React.createElement('div', null, `Drawing: ${a.drawing_name || a.drawing_id || ''}`),
+                            React.createElement('div', null, `Layout: ${a.layout_name}`),
+                            React.createElement('div', null, `Legend Seq: ${a.legend_sequence}`)
+                          )
+                        ))
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          ),
+
+          // Create Note Set modal
+          React.createElement((window.Modal || function Modal({ isOpen, onClose, title, children, footer }) { return isOpen ? React.createElement('div', { className: 'modal-overlay', onClick: onClose }, React.createElement('div', { className: 'modal', onClick: e => e.stopPropagation() }, React.createElement('div', { className: 'modal-header' }, React.createElement('h3', { className: 'modal-title' }, title), React.createElement('button', { className: 'btn btn-icon btn-ghost', onClick: onClose }, React.createElement('i', { className: 'fas fa-times' }))), React.createElement('div', { className: 'modal-body' }, children), React.createElement('div', { className: 'modal-footer' }, footer))) : null; }), {
+            isOpen: showNewSet,
+            onClose: () => setShowNewSet(false),
+            title: 'Create Note Set',
+            footer: React.createElement('div', { className: 'flex gap-sm justify-end' },
+              React.createElement('button', { className: 'btn', onClick: () => setShowNewSet(false) }, 'Cancel'),
+              React.createElement('button', { className: 'btn btn-primary', onClick: createNoteSet, disabled: !newSet.set_name || !selectedProject }, 'Create')
+            )
+          },
+            React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Set Name'),
+                React.createElement('input', { className: 'form-input', value: newSet.set_name, onChange: e => setNewSet({ ...newSet, set_name: e.target.value }), placeholder: 'e.g., 100% Civil Plans Notes' })
+              ),
+              React.createElement('div', { className: 'col-span-2' },
+                React.createElement('label', { className: 'form-label' }, 'Description'),
+                React.createElement('textarea', { className: 'form-input', rows: 3, value: newSet.description, onChange: e => setNewSet({ ...newSet, description: e.target.value }) })
+              ),
+              React.createElement('div', null,
+                React.createElement('label', { className: 'form-label' }, 'Discipline'),
+                React.createElement('input', { className: 'form-input', value: newSet.discipline, onChange: e => setNewSet({ ...newSet, discipline: e.target.value }), placeholder: 'Civil' })
               )
             )
           )
@@ -80,7 +386,7 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(SheetNoteManager));
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(SheetNoteApp));
   </script>
 </body>
 </html>

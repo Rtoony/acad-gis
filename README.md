@@ -9,7 +9,7 @@ Open, Python-first CAD/GIS system. The core value is a georeferenced PostGIS dat
 
 ## Status (Oct 2025)
 - Backend: FastAPI running; projects/drawings CRUD; stats/health; drawing render stub; DXF import stub.
-- Frontend: Tool launcher; Project Manager; Drawing Browser; Drawing Importer; Map Viewer (selectors, CRS transform, basemaps, geolocation).
+- Frontend: Tool launcher; Project Manager; Drawings Manager; Drawing Importer; Map Viewer (selectors, CRS transform, basemaps, geolocation).
 - Prototypes: `prototypes/joshycad` contains Python generators demonstrating DXF creation patterns (ezdxf, pandas, numpy, matplotlib).
 
 ## Architecture at a Glance
@@ -67,7 +67,7 @@ acad-gis/
 
 ## Tools
 - Project Manager: `frontend/tools/project-manager.html:1`
-- Drawing Browser: `frontend/tools/drawing_browser.html:1`
+- Drawings Manager: `frontend/tools/drawings-manager.html:1`
 - Drawing Importer: `frontend/tools/drawing-importer.html:1`
 - Map Viewer: `frontend/tools/map_viewer.html:1`
 - Pipe Network Viewer (Streamlit): `tools/pipe_network_viewer.py`

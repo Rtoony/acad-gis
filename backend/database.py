@@ -1155,6 +1155,521 @@ def update_pipe(pipe_id: str, updates: Dict[str, Any]) -> bool:
 def delete_pipe(pipe_id: str) -> None:
     execute_query("DELETE FROM pipes WHERE pipe_id = %s", (pipe_id,), fetch=False)
 
+# ============================================
+# SHEET NOTE MANAGER HELPERS
+# ============================================
+
+def list_sheet_note_sets(project_id: str) -> List[Dict]:
+    """Return note sets for a project with note_count."""
+    return execute_query(
+        """
+        SELECT s.set_id, s.project_id, s.set_name, s.description, s.discipline,
+               s.is_active, s.created_at, s.updated_at,
+               COUNT(n.project_note_id) AS note_count
+        FROM sheet_note_sets s
+        LEFT JOIN project_sheet_notes n ON n.set_id = s.set_id
+        WHERE s.project_id = %s
+        GROUP BY s.set_id
+        ORDER BY s.created_at DESC
+        """,
+        (project_id,)
+    )
+
+def create_sheet_note_set(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_note_sets (project_id, set_name, description, discipline, is_active)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload.get('project_id'), payload.get('set_name'), payload.get('description'),
+            payload.get('discipline'), bool(payload.get('is_active', False))
+        )
+    )
+    return row or {}
+
+def update_sheet_note_set(set_id: str, updates: Dict[str, Any]) -> Dict:
+    fields = []
+    params: List[Any] = []
+    for key in ('set_name', 'description', 'discipline', 'is_active'):
+        if key in updates:
+            fields.append(f"{key} = %s")
+            params.append(updates[key])
+    if not fields:
+        return execute_single("SELECT * FROM sheet_note_sets WHERE set_id = %s", (set_id,)) or {}
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(set_id)
+    execute_query(f"UPDATE sheet_note_sets SET {', '.join(fields)} WHERE set_id = %s", tuple(params), fetch=False)
+    return execute_single("SELECT * FROM sheet_note_sets WHERE set_id = %s", (set_id,)) or {}
+
+def delete_sheet_note_set(set_id: str) -> None:
+    execute_query("DELETE FROM sheet_note_sets WHERE set_id = %s", (set_id,), fetch=False)
+
+def activate_sheet_note_set(project_id: str, set_id: str) -> None:
+    execute_query("UPDATE sheet_note_sets SET is_active = FALSE WHERE project_id = %s", (project_id,), fetch=False)
+    execute_query("UPDATE sheet_note_sets SET is_active = TRUE WHERE set_id = %s", (set_id,), fetch=False)
+
+def list_project_sheet_notes(set_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT p.project_note_id, p.set_id, p.standard_note_id, p.display_code,
+               p.custom_title, p.custom_text, p.is_modified, p.sort_order, p.usage_count,
+               p.created_at, p.updated_at,
+               s.note_title AS standard_title, s.note_text AS standard_text,
+               s.note_category, s.discipline
+        FROM project_sheet_notes p
+        LEFT JOIN standard_notes s ON p.standard_note_id = s.note_id
+        WHERE p.set_id = %s
+        ORDER BY p.sort_order, p.created_at
+        """,
+        (set_id,)
+    )
+
+def _next_sort_order(set_id: str) -> int:
+    row = execute_single("SELECT COALESCE(MAX(sort_order), 0) AS max FROM project_sheet_notes WHERE set_id = %s", (set_id,))
+    return int((row or {}).get('max', 0)) + 1
+
+def create_project_sheet_note(payload: Dict[str, Any]) -> Dict:
+    set_id = payload.get('set_id')
+    std_id = payload.get('standard_note_id')
+    display_code = payload.get('display_code')
+    custom_title = payload.get('custom_title')
+    custom_text = payload.get('custom_text')
+    is_modified = bool(custom_title or custom_text)
+    sort_order = _next_sort_order(set_id)
+    row = execute_single(
+        """
+        INSERT INTO project_sheet_notes (set_id, standard_note_id, display_code, custom_title, custom_text, is_modified, sort_order)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (set_id, std_id, display_code, custom_title, custom_text, is_modified, sort_order)
+    )
+    return row or {}
+
+def update_project_sheet_note(project_note_id: str, updates: Dict[str, Any]) -> Dict:
+    fields = []
+    params: List[Any] = []
+    for key in ('display_code', 'custom_title', 'custom_text'):
+        if key in updates:
+            fields.append(f"{key} = %s")
+            params.append(updates[key])
+    if 'custom_title' in updates or 'custom_text' in updates:
+        fields.append("is_modified = %s")
+        params.append(True)
+    if not fields:
+        return execute_single("SELECT * FROM project_sheet_notes WHERE project_note_id = %s", (project_note_id,)) or {}
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(project_note_id)
+    execute_query(f"UPDATE project_sheet_notes SET {', '.join(fields)} WHERE project_note_id = %s", tuple(params), fetch=False)
+    return execute_single("SELECT * FROM project_sheet_notes WHERE project_note_id = %s", (project_note_id,)) or {}
+
+def delete_project_sheet_note(project_note_id: str) -> None:
+    execute_query("DELETE FROM project_sheet_notes WHERE project_note_id = %s", (project_note_id,), fetch=False)
+
+def reorder_project_sheet_note(project_note_id: str, new_order: int) -> None:
+    execute_query("UPDATE project_sheet_notes SET sort_order = %s WHERE project_note_id = %s", (new_order, project_note_id), fetch=False)
+
+def list_sheet_note_assignments(
+    drawing_id: Optional[str] = None,
+    layout_name: Optional[str] = None,
+    project_note_id: Optional[str] = None
+) -> List[Dict]:
+    if project_note_id:
+        return execute_query(
+            """
+            SELECT a.assignment_id, a.project_note_id, a.drawing_id, a.layout_name,
+                   a.legend_sequence, a.show_in_legend, a.assigned_at, a.assigned_by,
+                   d.drawing_name, d.drawing_number,
+                   p.project_name
+            FROM sheet_note_assignments a
+            LEFT JOIN drawings d ON a.drawing_id = d.drawing_id
+            LEFT JOIN projects p ON d.project_id = p.project_id
+            WHERE a.project_note_id = %s
+            ORDER BY a.assigned_at DESC
+            """,
+            (project_note_id,)
+        )
+    if drawing_id:
+        return execute_query(
+            """
+            SELECT a.assignment_id, a.project_note_id, a.drawing_id, a.layout_name,
+                   a.legend_sequence, a.show_in_legend, a.assigned_at, a.assigned_by,
+                   n.display_code,
+                   n.standard_note_id,
+                   n.is_modified,
+                   COALESCE(n.custom_title, s.note_title) AS note_title,
+                   COALESCE(n.custom_text, s.note_text) AS note_text
+            FROM sheet_note_assignments a
+            LEFT JOIN project_sheet_notes n ON a.project_note_id = n.project_note_id
+            LEFT JOIN standard_notes s ON n.standard_note_id = s.note_id
+            WHERE a.drawing_id = %s AND (%s IS NULL OR a.layout_name = %s)
+            ORDER BY a.legend_sequence
+            """,
+            (drawing_id, layout_name, layout_name)
+        )
+    return []
+
+def create_sheet_note_assignment(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_note_assignments (project_note_id, drawing_id, layout_name, legend_sequence, show_in_legend, assigned_by)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['project_note_id'], payload['drawing_id'], payload.get('layout_name') or 'Model',
+            payload['legend_sequence'], bool(payload.get('show_in_legend', True)), payload.get('assigned_by')
+        )
+    )
+    # increment usage_count
+    execute_query("UPDATE project_sheet_notes SET usage_count = usage_count + 1 WHERE project_note_id = %s", (payload['project_note_id'],), fetch=False)
+    return row or {}
+
+def delete_sheet_note_assignment(assignment_id: str) -> None:
+    # need project_note_id to decrement usage
+    row = execute_single("SELECT project_note_id FROM sheet_note_assignments WHERE assignment_id = %s", (assignment_id,))
+    execute_query("DELETE FROM sheet_note_assignments WHERE assignment_id = %s", (assignment_id,), fetch=False)
+    if row and row.get('project_note_id'):
+        execute_query("UPDATE project_sheet_notes SET usage_count = GREATEST(usage_count - 1, 0) WHERE project_note_id = %s", (row['project_note_id'],), fetch=False)
+
+def build_sheet_note_legend(drawing_id: str, layout_name: Optional[str]) -> Dict:
+    items = list_sheet_note_assignments(drawing_id=drawing_id, layout_name=layout_name)
+    legend = []
+    for it in items:
+        legend.append({
+            'legend_sequence': it['legend_sequence'],
+            'display_code': it.get('display_code') or '',
+            'note_title': it.get('note_title') or '',
+            'note_text': it.get('note_text') or '',
+            'standard_note_id': it.get('standard_note_id'),
+            'is_modified': bool(it.get('is_modified'))
+        })
+    return { 'drawing_id': drawing_id, 'layout_name': layout_name or 'Model', 'legend': legend, 'total_notes': len(legend) }
+
+# ============================================
+# SHEET SET MANAGER HELPERS
+# ============================================
+
+def list_sheet_sets(project_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT s.*, COUNT(sh.sheet_id) AS sheet_count,
+               p.project_name, p.project_number
+        FROM sheet_sets s
+        LEFT JOIN sheets sh ON sh.set_id = s.set_id
+        LEFT JOIN projects p ON p.project_id = s.project_id
+        WHERE s.project_id = %s
+        GROUP BY s.set_id, p.project_name, p.project_number
+        ORDER BY s.created_at DESC
+        """,
+        (project_id,)
+    )
+
+def create_sheet_set(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_sets (project_id, set_name, description, phase, discipline, status, issued_date, issued_to)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload.get('project_id'), payload.get('set_name'), payload.get('description'),
+            payload.get('phase'), payload.get('discipline'), payload.get('status', 'Draft'),
+            payload.get('issued_date'), payload.get('issued_to')
+        )
+    )
+    return row or {}
+
+def update_sheet_set(set_id: str, updates: Dict[str, Any]) -> Dict:
+    fields = []
+    params: List[Any] = []
+    for key in ('set_name', 'description', 'phase', 'discipline', 'status', 'issued_date', 'issued_to'):
+        if key in updates:
+            fields.append(f"{key} = %s")
+            params.append(updates[key])
+    if not fields:
+        return execute_single("SELECT * FROM sheet_sets WHERE set_id = %s", (set_id,)) or {}
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(set_id)
+    execute_query(f"UPDATE sheet_sets SET {', '.join(fields)} WHERE set_id = %s", tuple(params), fetch=False)
+    return execute_single("SELECT * FROM sheet_sets WHERE set_id = %s", (set_id,)) or {}
+
+def delete_sheet_set(set_id: str) -> None:
+    execute_query("DELETE FROM sheet_sets WHERE set_id = %s", (set_id,), fetch=False)
+
+def list_sheets(set_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT sh.*, CASE WHEN a.assignment_id IS NULL THEN 'unassigned' ELSE 'assigned' END AS assignment_status,
+               a.drawing_id, a.layout_name
+        FROM sheets sh
+        LEFT JOIN LATERAL (
+            SELECT assignment_id, drawing_id, layout_name
+            FROM sheet_drawing_assignments a
+            WHERE a.sheet_id = sh.sheet_id
+            ORDER BY a.assigned_at DESC
+            LIMIT 1
+        ) a ON TRUE
+        WHERE sh.set_id = %s
+        ORDER BY COALESCE(sh.sheet_hierarchy_number, 50), sh.sheet_code
+        """,
+        (set_id,)
+    )
+
+def renumber_sheets(set_id: str) -> int:
+    sheets = execute_query(
+        """
+        SELECT sheet_id FROM sheets
+        WHERE set_id = %s
+        ORDER BY COALESCE(sheet_hierarchy_number,50), sheet_code
+        """,
+        (set_id,)
+    )
+    count = 0
+    for idx, sh in enumerate(sheets, start=1):
+        execute_query("UPDATE sheets SET sheet_number = %s WHERE sheet_id = %s", (idx, sh['sheet_id']), fetch=False)
+        count += 1
+    return count
+
+def create_sheet(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheets (set_id, sheet_code, sheet_title, discipline_code, sheet_type, sheet_category, sheet_hierarchy_number, scale, sheet_size, template_id, revision_number)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['set_id'], payload.get('sheet_code'), payload.get('sheet_title'), payload.get('discipline_code'),
+            payload.get('sheet_type'), payload.get('sheet_category'), payload.get('sheet_hierarchy_number', 50),
+            payload.get('scale'), payload.get('sheet_size','24x36'), payload.get('template_id'), payload.get('revision_number', 0)
+        )
+    )
+    # auto-renumber
+    renumber_sheets(payload['set_id'])
+    return row or {}
+
+def update_sheet(sheet_id: str, updates: Dict[str, Any]) -> Dict:
+    fields = []
+    params: List[Any] = []
+    for key in ('sheet_code','sheet_title','discipline_code','sheet_type','sheet_category','sheet_hierarchy_number','scale','sheet_size','template_id','revision_number','revision_date','notes'):
+        if key in updates:
+            fields.append(f"{key} = %s")
+            params.append(updates[key])
+    if not fields:
+        return execute_single("SELECT * FROM sheets WHERE sheet_id = %s", (sheet_id,)) or {}
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(sheet_id)
+    execute_query(f"UPDATE sheets SET {', '.join(fields)} WHERE sheet_id = %s", tuple(params), fetch=False)
+    return execute_single("SELECT * FROM sheets WHERE sheet_id = %s", (sheet_id,)) or {}
+
+def delete_sheet(sheet_id: str) -> None:
+    execute_query("DELETE FROM sheets WHERE sheet_id = %s", (sheet_id,), fetch=False)
+
+
+# ============================================
+# SHEET SET MANAGER – ADDITIONAL HELPERS
+# ============================================
+
+def list_sheet_drawing_assignments(sheet_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT a.assignment_id, a.sheet_id, a.drawing_id, a.layout_name,
+               a.assigned_at, a.assigned_by, a.notes,
+               d.drawing_name
+        FROM sheet_drawing_assignments a
+        LEFT JOIN drawings d ON a.drawing_id = d.drawing_id
+        WHERE a.sheet_id = %s
+        ORDER BY a.assigned_at DESC
+        """,
+        (sheet_id,)
+    )
+
+
+def create_sheet_drawing_assignment(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_drawing_assignments (sheet_id, drawing_id, layout_name, assigned_by, notes)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['sheet_id'], payload.get('drawing_id'), payload.get('layout_name'),
+            payload.get('assigned_by'), payload.get('notes')
+        )
+    )
+    return row or {}
+
+
+def delete_sheet_drawing_assignment(assignment_id: str) -> None:
+    execute_query("DELETE FROM sheet_drawing_assignments WHERE assignment_id = %s", (assignment_id,), fetch=False)
+
+
+def list_sheet_revisions(sheet_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT revision_id, sheet_id, revision_number, revision_date, description,
+               revised_by, reference_number, created_at
+        FROM sheet_revisions
+        WHERE sheet_id = %s
+        ORDER BY revision_date DESC, created_at DESC
+        """,
+        (sheet_id,)
+    )
+
+
+def create_sheet_revision(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_revisions (sheet_id, revision_number, revision_date, description, revised_by, reference_number)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['sheet_id'], payload['revision_number'], payload['revision_date'],
+            payload.get('description'), payload.get('revised_by'), payload.get('reference_number')
+        )
+    )
+    return row or {}
+
+
+def list_sheet_relationships(sheet_id: str) -> List[Dict]:
+    return execute_query(
+        """
+        SELECT r.relationship_id, r.source_sheet_id, r.target_sheet_id, r.relationship_type, r.notes, r.created_at,
+               s1.sheet_code AS source_sheet_code, s1.sheet_title AS source_sheet_title,
+               s2.sheet_code AS target_sheet_code, s2.sheet_title AS target_sheet_title
+        FROM sheet_relationships r
+        LEFT JOIN sheets s1 ON r.source_sheet_id = s1.sheet_id
+        LEFT JOIN sheets s2 ON r.target_sheet_id = s2.sheet_id
+        WHERE r.source_sheet_id = %s OR r.target_sheet_id = %s
+        ORDER BY r.created_at DESC
+        """,
+        (sheet_id, sheet_id)
+    )
+
+
+def create_sheet_relationship(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO sheet_relationships (source_sheet_id, target_sheet_id, relationship_type, notes)
+        VALUES (%s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['source_sheet_id'], payload['target_sheet_id'], payload['relationship_type'], payload.get('notes')
+        )
+    )
+    return row or {}
+
+
+def delete_sheet_relationship(relationship_id: str) -> None:
+    execute_query("DELETE FROM sheet_relationships WHERE relationship_id = %s", (relationship_id,), fetch=False)
+
+
+def generate_sheet_index(set_id: str) -> Dict:
+    rows = execute_query(
+        """
+        SELECT sheet_number, sheet_code, sheet_title, scale, revision_number, revision_date
+        FROM sheets
+        WHERE set_id = %s
+        ORDER BY sheet_number NULLS LAST, COALESCE(sheet_hierarchy_number,50), sheet_code
+        """,
+        (set_id,)
+    )
+    return { 'set_id': set_id, 'sheets': rows, 'total_sheets': len(rows) }
+
+
+# ============================================
+# PROJECT DETAILS HELPERS
+# ============================================
+
+def get_project_details(project_id: str) -> Optional[Dict]:
+    return execute_single(
+        """
+        SELECT project_id, project_address, city, state, zip_code, county, engineer_of_record,
+               engineer_license, jurisdiction, permit_number, parcel_number, project_area_acres,
+               project_description, owner_name, owner_contact, created_at, updated_at
+        FROM project_details
+        WHERE project_id = %s
+        """,
+        (project_id,)
+    )
+
+
+def create_project_details(payload: Dict[str, Any]) -> Dict:
+    row = execute_single(
+        """
+        INSERT INTO project_details (
+            project_id, project_address, city, state, zip_code, county, engineer_of_record,
+            engineer_license, jurisdiction, permit_number, parcel_number, project_area_acres,
+            project_description, owner_name, owner_contact
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING *
+        """,
+        (
+            payload['project_id'], payload.get('project_address'), payload.get('city'), payload.get('state'),
+            payload.get('zip_code'), payload.get('county'), payload.get('engineer_of_record'),
+            payload.get('engineer_license'), payload.get('jurisdiction'), payload.get('permit_number'),
+            payload.get('parcel_number'), payload.get('project_area_acres'), payload.get('project_description'),
+            payload.get('owner_name'), payload.get('owner_contact')
+        )
+    )
+    return row or {}
+
+
+def update_project_details(project_id: str, updates: Dict[str, Any]) -> Dict:
+    fields = []
+    params: List[Any] = []
+    for key in (
+        'project_address','city','state','zip_code','county','engineer_of_record','engineer_license',
+        'jurisdiction','permit_number','parcel_number','project_area_acres','project_description','owner_name','owner_contact'
+    ):
+        if key in updates:
+            fields.append(f"{key} = %s")
+            params.append(updates[key])
+    if not fields:
+        return get_project_details(project_id) or {}
+    fields.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(project_id)
+    execute_query(f"UPDATE project_details SET {', '.join(fields)} WHERE project_id = %s", tuple(params), fetch=False)
+    return get_project_details(project_id) or {}
+
+
+# ============================================
+# STANDARD NOTES (LIBRARY) HELPERS
+# ============================================
+
+def list_standard_notes(
+    note_category: Optional[str] = None,
+    discipline: Optional[str] = None,
+    q: Optional[str] = None,
+    is_active: Optional[bool] = None
+) -> List[Dict]:
+    filters: List[str] = []
+    params: List[Any] = []
+    if note_category:
+        filters.append("note_category = %s")
+        params.append(note_category)
+    if discipline:
+        filters.append("discipline = %s")
+        params.append(discipline)
+    if is_active is not None:
+        filters.append("is_active = %s")
+        params.append(is_active)
+    if q:
+        filters.append("(note_title ILIKE %s OR note_text ILIKE %s)")
+        like = f"%{q}%"
+        params.extend([like, like])
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
+    query = f"""
+        SELECT note_id, note_category, note_title, note_text, discipline, created_at, updated_at, is_active
+        FROM standard_notes
+        {where}
+        ORDER BY note_category NULLS LAST, note_title
+    """
+    return execute_query(query, tuple(params) if params else None)
 
 def get_pipe_network_detail(network_id: str) -> Optional[Dict]:
     network = execute_single(

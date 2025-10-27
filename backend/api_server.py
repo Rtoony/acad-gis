@@ -629,7 +629,7 @@ def get_project_drawings(project_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get drawings: {str(e)}")
 
 @app.get("/api/drawings")
-def get_all_drawings(limit: int = 100, search: Optional[str] = None):
+def get_all_drawings(limit: int = 500, search: Optional[str] = None):
     """Get all drawings with optional search"""
     try:
         if search:
@@ -640,6 +640,10 @@ def get_all_drawings(limit: int = 100, search: Optional[str] = None):
                     d.drawing_number,
                     d.drawing_type,
                     d.scale,
+                    d.description,
+                    d.tags,
+                    d.cad_units,
+                    d.scale_factor,
                     d.created_at,
                     d.is_georeferenced,
                     d.drawing_epsg_code,
@@ -667,6 +671,10 @@ def get_all_drawings(limit: int = 100, search: Optional[str] = None):
                     d.drawing_number,
                     d.drawing_type,
                     d.scale,
+                    d.description,
+                    d.tags,
+                    d.cad_units,
+                    d.scale_factor,
                     d.created_at,
                     d.is_georeferenced,
                     d.drawing_epsg_code,
@@ -691,23 +699,35 @@ def get_all_drawings(limit: int = 100, search: Optional[str] = None):
 
 @app.get("/api/drawings/{drawing_id}")
 def get_drawing(drawing_id: str):
-    """Get basic drawing information"""
+    """Get detailed drawing information including project and has_content"""
     try:
-        drawing = database.get_drawing(drawing_id)
+        drawing = database.execute_single(
+            """
+            SELECT 
+                d.*, 
+                p.project_name, 
+                p.project_number,
+                CASE WHEN d.dxf_content IS NOT NULL THEN true ELSE false END AS has_content
+            FROM drawings d
+            LEFT JOIN projects p ON d.project_id = p.project_id
+            WHERE d.drawing_id = %s
+            """,
+            (drawing_id,)
+        )
         if not drawing:
             raise HTTPException(status_code=404, detail="Drawing not found")
-        
+
         if 'dxf_content' in drawing:
-            drawing['has_dxf_content'] = drawing['dxf_content'] is not None
+            drawing['has_content'] = drawing['dxf_content'] is not None
             del drawing['dxf_content']
-        
+
         return drawing
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get drawing: {str(e)}")
 
-@app.post("/api/drawings")
+@app.post("/api/drawings", status_code=201)
 def create_drawing(drawing: DrawingCreate):
     """Create new drawing"""
     try:
@@ -719,11 +739,13 @@ def create_drawing(drawing: DrawingCreate):
             scale=drawing.scale,
             description=drawing.description
         )
-        
-        return {
-            "drawing_id": drawing_id,
-            "message": "Drawing created successfully"
-        }
+        created = database.execute_single(
+            "SELECT * FROM drawings WHERE drawing_id = %s",
+            (drawing_id,)
+        )
+        if created and 'dxf_content' in created:
+            del created['dxf_content']
+        return created or {"drawing_id": drawing_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create drawing: {str(e)}")
 
@@ -755,17 +777,34 @@ def update_drawing(drawing_id: str, drawing: DrawingUpdate):
         if drawing.description is not None:
             update_fields.append("description = %s")
             params.append(drawing.description)
-        
+        if getattr(drawing, 'tags', None) is not None:
+            update_fields.append("tags = %s")
+            params.append(drawing.tags)
+        if getattr(drawing, 'is_georeferenced', None) is not None:
+            update_fields.append("is_georeferenced = %s")
+            params.append(drawing.is_georeferenced)
+        if getattr(drawing, 'drawing_epsg_code', None) is not None:
+            update_fields.append("drawing_epsg_code = %s")
+            params.append(drawing.drawing_epsg_code)
+        if getattr(drawing, 'drawing_coordinate_system', None) is not None:
+            update_fields.append("drawing_coordinate_system = %s")
+            params.append(drawing.drawing_coordinate_system)
+
         if not update_fields:
-            return {"message": "No fields to update"}
-        
+            refreshed = database.execute_single("SELECT * FROM drawings WHERE drawing_id = %s", (drawing_id,))
+            if refreshed and 'dxf_content' in refreshed:
+                del refreshed['dxf_content']
+            return {"success": True, "drawing": refreshed}
+
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
         params.append(drawing_id)
         
         query = f"UPDATE drawings SET {', '.join(update_fields)} WHERE drawing_id = %s"
-        database.execute_query(query, tuple(params))
-        
-        return {"message": "Drawing updated successfully"}
+        database.execute_query(query, tuple(params), fetch=False)
+        updated = database.execute_single("SELECT * FROM drawings WHERE drawing_id = %s", (drawing_id,))
+        if updated and 'dxf_content' in updated:
+            del updated['dxf_content']
+        return {"success": True, "drawing": updated}
     except HTTPException:
         raise
     except Exception as e:
@@ -779,13 +818,9 @@ def delete_drawing(drawing_id: str):
         existing = database.get_drawing(drawing_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Drawing not found")
-        
-        # Delete associated data first (layers, inserts, etc.)
-        database.execute_query("DELETE FROM block_inserts WHERE drawing_id = %s", (drawing_id,))
-        database.execute_query("DELETE FROM layers WHERE drawing_id = %s", (drawing_id,))
-        database.execute_query("DELETE FROM drawings WHERE drawing_id = %s", (drawing_id,))
-        
-        return {"message": "Drawing deleted successfully"}
+        # Rely on cascade deletes for child tables
+        database.execute_query("DELETE FROM drawings WHERE drawing_id = %s", (drawing_id,), fetch=False)
+        return {"success": True}
     except HTTPException:
         raise
     except Exception as e:
@@ -1432,6 +1467,336 @@ def update_conflict(conflict_id: str, payload: Dict[str, Any]):
 @app.get("/api/sheet-notes")
 def list_sheet_notes(project_id: Optional[str] = None):
     return database.list_sheet_notes(project_id)
+
+# ============================================
+# SHEET NOTE MANAGER API
+# ============================================
+
+@app.get("/api/sheet-note-sets")
+def api_get_sheet_note_sets(project_id: str):
+    try:
+        return { "sets": database.list_sheet_note_sets(project_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get note sets: {str(e)}")
+
+@app.post("/api/sheet-note-sets")
+def api_create_sheet_note_set(payload: Dict[str, Any]):
+    try:
+        created = database.create_sheet_note_set(payload)
+        return { "set": created }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create note set: {str(e)}")
+
+@app.put("/api/sheet-note-sets/{set_id}")
+def api_update_sheet_note_set(set_id: str, payload: Dict[str, Any]):
+    try:
+        updated = database.update_sheet_note_set(set_id, payload)
+        return { "set": updated }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update note set: {str(e)}")
+
+@app.delete("/api/sheet-note-sets/{set_id}")
+def api_delete_sheet_note_set(set_id: str):
+    try:
+        database.delete_sheet_note_set(set_id)
+        return { "message": "Sheet note set deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete note set: {str(e)}")
+
+@app.patch("/api/sheet-note-sets/activate")
+def api_activate_sheet_note_set(payload: Dict[str, Any]):
+    try:
+        set_id = payload.get('set_id'); project_id = payload.get('project_id')
+        if not set_id or not project_id:
+            raise HTTPException(status_code=400, detail="set_id and project_id required")
+        database.activate_sheet_note_set(project_id, set_id)
+        return { "message": "Sheet note set activated successfully" }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to activate note set: {str(e)}")
+
+@app.get("/api/project-sheet-notes")
+def api_get_project_sheet_notes(set_id: str):
+    try:
+        return { "notes": database.list_project_sheet_notes(set_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get project notes: {str(e)}")
+
+@app.post("/api/project-sheet-notes")
+def api_create_project_sheet_note(payload: Dict[str, Any]):
+    try:
+        if payload.get('standard_note_id') is None:
+            if not payload.get('custom_title') or not payload.get('custom_text'):
+                raise HTTPException(status_code=400, detail="custom_title and custom_text required for custom note")
+        created = database.create_project_sheet_note(payload)
+        return { "note": created }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create project note: {str(e)}")
+
+@app.put("/api/project-sheet-notes/{project_note_id}")
+def api_update_project_sheet_note(project_note_id: str, payload: Dict[str, Any]):
+    try:
+        updated = database.update_project_sheet_note(project_note_id, payload)
+        return { "note": updated }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update project note: {str(e)}")
+
+@app.delete("/api/project-sheet-notes/{project_note_id}")
+def api_delete_project_sheet_note(project_note_id: str):
+    try:
+        database.delete_project_sheet_note(project_note_id)
+        return { "message": "Project note deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete project note: {str(e)}")
+
+@app.patch("/api/project-sheet-notes/{project_note_id}/reorder")
+def api_reorder_project_sheet_note(project_note_id: str, payload: Dict[str, Any]):
+    try:
+        new_order = payload.get('new_order')
+        if new_order is None:
+            raise HTTPException(status_code=400, detail="new_order required")
+        database.reorder_project_sheet_note(project_note_id, int(new_order))
+        return { "message": "Note reordered successfully" }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reorder note: {str(e)}")
+
+@app.get("/api/sheet-note-assignments")
+def api_get_sheet_note_assignments(drawing_id: Optional[str] = None, layout_name: Optional[str] = None, project_note_id: Optional[str] = None):
+    try:
+        return { "assignments": database.list_sheet_note_assignments(drawing_id, layout_name, project_note_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get assignments: {str(e)}")
+
+@app.post("/api/sheet-note-assignments")
+def api_create_sheet_note_assignment(payload: Dict[str, Any]):
+    try:
+        created = database.create_sheet_note_assignment(payload)
+        return { "assignment": created }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create assignment: {str(e)}")
+
+@app.delete("/api/sheet-note-assignments/{assignment_id}")
+def api_delete_sheet_note_assignment(assignment_id: str):
+    try:
+        database.delete_sheet_note_assignment(assignment_id)
+        return { "message": "Assignment deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete assignment: {str(e)}")
+
+@app.get("/api/sheet-note-legend")
+def api_get_sheet_note_legend(drawing_id: str, layout_name: Optional[str] = None):
+    try:
+        return database.build_sheet_note_legend(drawing_id, layout_name)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build legend: {str(e)}")
+
+# ============================================
+# SHEET SET MANAGER API
+# ============================================
+
+@app.get("/api/standard-notes")
+def api_list_standard_notes(
+    note_category: Optional[str] = None,
+    discipline: Optional[str] = None,
+    q: Optional[str] = None,
+    is_active: Optional[bool] = None
+):
+    try:
+        return { "standard_notes": database.list_standard_notes(note_category, discipline, q, is_active) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list standard notes: {str(e)}")
+
+@app.get("/api/sheet-sets")
+def api_get_sheet_sets(project_id: str):
+    try:
+        return { "sheet_sets": database.list_sheet_sets(project_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sheet sets: {str(e)}")
+
+@app.post("/api/sheet-sets")
+def api_create_sheet_set(payload: Dict[str, Any]):
+    try:
+        created = database.create_sheet_set(payload)
+        return created
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create sheet set: {str(e)}")
+
+@app.put("/api/sheet-sets/{set_id}")
+def api_update_sheet_set(set_id: str, payload: Dict[str, Any]):
+    try:
+        updated = database.update_sheet_set(set_id, payload)
+        return { "sheet_set": updated }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update sheet set: {str(e)}")
+
+@app.delete("/api/sheet-sets/{set_id}")
+def api_delete_sheet_set(set_id: str):
+    try:
+        database.delete_sheet_set(set_id)
+        return { "message": "Sheet set deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete sheet set: {str(e)}")
+
+@app.get("/api/sheets")
+def api_get_sheets(set_id: str):
+    try:
+        return { "sheets": database.list_sheets(set_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sheets: {str(e)}")
+
+@app.post("/api/sheets")
+def api_create_sheet(payload: Dict[str, Any]):
+    try:
+        created = database.create_sheet(payload)
+        return { "sheet": created }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create sheet: {str(e)}")
+
+@app.put("/api/sheets/{sheet_id}")
+def api_update_sheet(sheet_id: str, payload: Dict[str, Any]):
+    try:
+        updated = database.update_sheet(sheet_id, payload)
+        return { "sheet": updated }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update sheet: {str(e)}")
+
+@app.delete("/api/sheets/{sheet_id}")
+def api_delete_sheet(sheet_id: str):
+    try:
+        database.delete_sheet(sheet_id)
+        return { "message": "Sheet deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete sheet: {str(e)}")
+
+@app.post("/api/sheets/renumber/{set_id}")
+def api_renumber_sheets(set_id: str):
+    try:
+        count = database.renumber_sheets(set_id)
+        return { "message": "Sheets renumbered successfully", "updated_count": count }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to renumber sheets: {str(e)}")
+
+# Sheet drawing assignments
+@app.get("/api/sheet-drawing-assignments")
+def api_get_sheet_drawing_assignments(sheet_id: str):
+    try:
+        return { "assignments": database.list_sheet_drawing_assignments(sheet_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get drawing assignments: {str(e)}")
+
+@app.post("/api/sheet-drawing-assignments")
+def api_create_sheet_drawing_assignment(payload: Dict[str, Any]):
+    try:
+        if not payload.get('sheet_id'):
+            raise HTTPException(status_code=400, detail="sheet_id is required")
+        created = database.create_sheet_drawing_assignment(payload)
+        return { "assignment": created }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create drawing assignment: {str(e)}")
+
+@app.delete("/api/sheet-drawing-assignments/{assignment_id}")
+def api_delete_sheet_drawing_assignment(assignment_id: str):
+    try:
+        database.delete_sheet_drawing_assignment(assignment_id)
+        return { "message": "Assignment deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete drawing assignment: {str(e)}")
+
+# Sheet revisions
+@app.get("/api/sheet-revisions")
+def api_get_sheet_revisions(sheet_id: str):
+    try:
+        return { "revisions": database.list_sheet_revisions(sheet_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sheet revisions: {str(e)}")
+
+@app.post("/api/sheet-revisions")
+def api_create_sheet_revision(payload: Dict[str, Any]):
+    try:
+        required = ('sheet_id','revision_number','revision_date')
+        for r in required:
+            if not payload.get(r):
+                raise HTTPException(status_code=400, detail=f"{r} is required")
+        created = database.create_sheet_revision(payload)
+        return { "revision": created }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create sheet revision: {str(e)}")
+
+# Sheet relationships
+@app.get("/api/sheet-relationships")
+def api_get_sheet_relationships(sheet_id: str):
+    try:
+        return { "relationships": database.list_sheet_relationships(sheet_id) }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sheet relationships: {str(e)}")
+
+@app.post("/api/sheet-relationships")
+def api_create_sheet_relationship(payload: Dict[str, Any]):
+    try:
+        required = ('source_sheet_id','target_sheet_id','relationship_type')
+        for r in required:
+            if not payload.get(r):
+                raise HTTPException(status_code=400, detail=f"{r} is required")
+        created = database.create_sheet_relationship(payload)
+        return { "relationship": created }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create relationship: {str(e)}")
+
+@app.delete("/api/sheet-relationships/{relationship_id}")
+def api_delete_sheet_relationship(relationship_id: str):
+    try:
+        database.delete_sheet_relationship(relationship_id)
+        return { "message": "Relationship deleted successfully" }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete relationship: {str(e)}")
+
+# Sheet index
+@app.get("/api/sheet-index/{set_id}")
+def api_get_sheet_index(set_id: str):
+    try:
+        return database.generate_sheet_index(set_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate sheet index: {str(e)}")
+
+# Project details
+@app.get("/api/project-details")
+def api_get_project_details(project_id: str):
+    try:
+        details = database.get_project_details(project_id)
+        return { "project_details": details }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get project details: {str(e)}")
+
+@app.post("/api/project-details")
+def api_create_project_details(payload: Dict[str, Any]):
+    try:
+        if not payload.get('project_id'):
+            raise HTTPException(status_code=400, detail="project_id is required")
+        created = database.create_project_details(payload)
+        return { "project_details": created }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create project details: {str(e)}")
+
+@app.put("/api/project-details/{project_id}")
+def api_update_project_details(project_id: str, payload: Dict[str, Any]):
+    try:
+        updated = database.update_project_details(project_id, payload)
+        return { "project_details": updated }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update project details: {str(e)}")
 
 # GeoJSON endpoints (empty feature collections)
 @app.get("/api/pipes/geojson")
