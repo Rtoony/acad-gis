@@ -52,12 +52,18 @@
       const [error, setError] = useState('');
       const [showView, setShowView] = useState(false);
       const [selected, setSelected] = useState(null);
+      const [showForm, setShowForm] = useState(false);
+      const [formMode, setFormMode] = useState('create');
+      const [formData, setFormData] = useState({ project_name: '', project_number: '', client_name: '', description: '' });
+      const [saving, setSaving] = useState(false);
+      const [showArchived, setShowArchived] = useState(false);
 
       const load = async () => {
         setLoading(true); setError('');
         try {
-          const data = await apiClient.list('/projects');
-          setProjects(data);
+          const result = await apiClient.list('/projects', showArchived ? { include_archived: true } : undefined);
+          const list = Array.isArray(result) ? result : (result?.projects || []);
+          setProjects(list);
         } catch (e) {
           setError(e.message || 'Failed to load projects');
         } finally {
@@ -66,22 +72,112 @@
       };
 
       useEffect(() => { load(); }, []);
+      useEffect(() => { load(); }, [showArchived]);
 
-      const columns = [
-        { key: 'project_number', label: 'Project #', sortable: true },
-        { key: 'project_name', label: 'Project Name', sortable: true },
-        { key: 'client_name', label: 'Client', sortable: true },
-        { key: 'drawing_count', label: 'Drawings', sortable: true, format: 'number' },
-        { key: 'created_at', label: 'Created', sortable: true, format: 'date' },
-      ];
+      const columns = (() => {
+        const base = [
+          { key: 'project_number', label: 'Project #', sortable: true },
+          { key: 'project_name', label: 'Project Name', sortable: true },
+          { key: 'client_name', label: 'Client', sortable: true },
+          { key: 'drawing_count', label: 'Drawings', sortable: true, format: 'number' },
+          { key: 'created_at', label: 'Created', sortable: true, format: 'date' },
+        ];
+        if (showArchived) base.splice(2, 0, { key: 'is_archived', label: 'Archived', sortable: true });
+        return base;
+      })();
 
       const onView = (row) => { setSelected(row); setShowView(true); };
-      const onEdit = (row) => { Toast.info(`Edit ${row.project_name}`); };
-      const onDelete = async (row) => {
-        if (!confirm(`Delete project "${row.project_name}"?`)) return;
-        try { await apiClient.delete('/projects', row.project_id); Toast.success('Deleted'); await load(); }
-        catch (e) { Toast.error(e.message); }
+      const onEdit = (row) => {
+        setFormMode('edit');
+        setSelected(row);
+        setFormData({
+          project_name: row.project_name || '',
+          project_number: row.project_number || '',
+          client_name: row.client_name || '',
+          description: row.description || ''
+        });
+        setShowForm(true);
       };
+      const onDelete = async (row) => {
+        if (showArchived) {
+          if (!confirm(`Permanently delete project \"${row.project_name}\" and all related data? This cannot be undone.`)) return;
+          try { await apiClient.request('DELETE', `/projects/${row.project_id}?hard=true`); Toast.success('Deleted permanently'); await load(); }
+          catch (e) { Toast.error(e.message); }
+        } else {
+          if (!confirm(`Archive project \"${row.project_name}\"?`)) return;
+          try { await apiClient.delete('/projects', row.project_id); Toast.success('Archived'); await load(); }
+          catch (e) { Toast.error(e.message); }
+        }
+      };
+
+      const openCreate = () => {
+        setFormMode('create');
+        setSelected(null);
+        setFormData({ project_name: '', project_number: '', client_name: '', description: '' });
+        setShowForm(true);
+      };
+
+      const saveForm = async (e) => {
+        e?.preventDefault?.();
+        if (!formData.project_name || !formData.project_name.trim()) {
+          Toast.error('Project name is required');
+          return;
+        }
+        setSaving(true);
+        try {
+          if (formMode === 'create') {
+            await apiClient.create('/projects', {
+              project_name: formData.project_name.trim(),
+              project_number: formData.project_number || null,
+              client_name: formData.client_name || null,
+              description: formData.description || null,
+            });
+            Toast.success('Project created');
+          } else if (formMode === 'edit' && selected) {
+            await apiClient.update('/projects', selected.project_id, {
+              project_name: formData.project_name.trim(),
+              project_number: formData.project_number || null,
+              client_name: formData.client_name || null,
+              description: formData.description || null,
+            });
+            Toast.success('Project updated');
+          }
+          setShowForm(false);
+          await load();
+        } catch (err) {
+          Toast.error(err.message || 'Save failed');
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      // Partition for split view when showing archived
+      const activeProjects = projects.filter(p => !p.is_archived);
+      const archivedProjects = projects.filter(p => p.is_archived);
+      const archivedColumns = columns.map(col => {
+        if (col.key === 'project_name') {
+          return {
+            ...col,
+            render: (v) => React.createElement('span', null,
+              v,
+              ' ',
+              React.createElement('span', {
+                className: 'badge',
+                style: {
+                  backgroundColor: 'rgba(255,193,7,0.15)',
+                  color: '#8a6d3b',
+                  border: '1px solid rgba(255,193,7,0.45)',
+                  marginLeft: '6px',
+                  padding: '2px 6px',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem'
+                }
+              }, 'Archived')
+            )
+          };
+        }
+        return col;
+      });
 
       return (
         React.createElement('div', { className: 'page-wrapper' },
@@ -99,23 +195,64 @@
                       React.createElement('i', { className: 'fas fa-rotate' }), ' Refresh'
                     ),
                     ' ',
-                    React.createElement('a', { className: 'btn btn-primary', href: 'drawing-importer.html' },
-                      React.createElement('i', { className: 'fas fa-file-import' }), ' Import Drawings')
+                    ' ',
+                    React.createElement('label', { className: 'ml-sm mr-sm flex items-center gap-sm' },
+                      React.createElement('input', { type: 'checkbox', checked: showArchived, onChange: (e) => setShowArchived(e.target.checked) }),
+                      ' Show Archived'
+                    ),
+                    ' ',
+                    React.createElement('button', { className: 'btn btn-primary', onClick: openCreate },
+                      React.createElement('i', { className: 'fas fa-plus' }), ' New Project')
                   )
                 ),
                 error && React.createElement('div', { className: 'alert alert-danger mb-md' }, error),
                 loading ? React.createElement(LoadingSpinnerComp, { text: 'Loading projects...' }) :
-                  React.createElement(DataTableComp, {
-                    data: projects,
-                    columns,
-                    onView,
-                    onEdit,
-                    onDelete,
-                    searchable: true,
-                    pagination: true,
-                    pageSize: 20,
-                    emptyMessage: 'No projects found'
-                  })
+                  (showArchived ?
+                    React.createElement(React.Fragment, null,
+                      // Active projects section
+                      React.createElement('div', { className: 'mb-md' },
+                        React.createElement('div', { className: 'text-muted mb-sm' }, 'Active Projects'),
+                        React.createElement(DataTableComp, {
+                          data: activeProjects,
+                          columns,
+                          onView,
+                          onEdit,
+                          onDelete,
+                          searchable: true,
+                          pagination: true,
+                          pageSize: 20,
+                          emptyMessage: 'No active projects'
+                        })
+                      ),
+                      // Archived projects section
+                      React.createElement('div', { className: 'mt-md', style: { backgroundColor: 'rgba(255,193,7,0.06)', padding: '12px', borderRadius: '8px', border: '1px dashed rgba(255,193,7,0.4)' } },
+                        React.createElement('div', { className: 'text-muted mb-sm' }, 'Archived Projects'),
+                        React.createElement(DataTableComp, {
+                          data: archivedProjects,
+                          columns: archivedColumns,
+                          onView,
+                          onEdit,
+                          onDelete,
+                          searchable: true,
+                          pagination: true,
+                          pageSize: 20,
+                          emptyMessage: 'No archived projects'
+                        })
+                      )
+                    )
+                    :
+                    React.createElement(DataTableComp, {
+                      data: projects,
+                      columns,
+                      onView,
+                      onEdit,
+                      onDelete,
+                      searchable: true,
+                      pagination: true,
+                      pageSize: 20,
+                      emptyMessage: 'No projects found'
+                    })
+                  )
               )
             )
           ),
@@ -136,6 +273,77 @@
               React.createElement('div', { className: 'col-span-2' },
                 React.createElement('div', { className: 'text-muted' }, 'Description'),
                 React.createElement('div', null, selected.description || '-')
+              ),
+              React.createElement('div', { className: 'col-span-2 mt-md flex gap-sm justify-end' },
+                React.createElement('button', { className: 'btn', onClick: () => setShowView(false) }, 'Close'),
+                (!selected || !selected.is_archived) && React.createElement('button', { className: 'btn btn-warning', onClick: async () => {
+                  if (confirm(`Archive project \"${selected.project_name}\"?`)) {
+                    try { await apiClient.delete('/projects', selected.project_id); Toast.success('Archived'); setShowView(false); await load(); }
+                    catch (e) { Toast.error(e.message); }
+                  }
+                } }, 'Archive'),
+                (selected && selected.is_archived) && React.createElement('button', { className: 'btn btn-secondary', onClick: async () => {
+                  try { await apiClient.request('PUT', `/projects/${selected.project_id}/restore`); Toast.success('Restored'); setShowView(false); await load(); }
+                  catch (e) { Toast.error(e.message); }
+                } }, 'Restore'),
+                React.createElement('button', { className: 'btn btn-danger', onClick: async () => {
+                  if (confirm(`Permanently delete project \"${selected.project_name}\" and all related data? This cannot be undone.`)) {
+                    try { await apiClient.request('DELETE', `/projects/${selected.project_id}?hard=true`); Toast.success('Deleted permanently'); setShowView(false); await load(); }
+                    catch (e) { Toast.error(e.message); }
+                  }
+                } }, 'Delete Permanently')
+              )
+            )
+          ),
+          React.createElement(ModalComp, {
+            isOpen: showForm,
+            onClose: () => setShowForm(false),
+            title: formMode === 'create' ? 'New Project' : `Edit: ${selected?.project_name || ''}`
+          },
+            React.createElement('form', { onSubmit: saveForm },
+              React.createElement('div', { className: 'grid grid-cols-2 gap-md' },
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Project Name'),
+                  React.createElement('input', {
+                    className: 'form-input',
+                    value: formData.project_name,
+                    onChange: (e) => setFormData({ ...formData, project_name: e.target.value }),
+                    placeholder: 'e.g., Main Street Development',
+                    required: true
+                  })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Project Number'),
+                  React.createElement('input', {
+                    className: 'form-input',
+                    value: formData.project_number,
+                    onChange: (e) => setFormData({ ...formData, project_number: e.target.value }),
+                    placeholder: 'e.g., 2025-001'
+                  })
+                ),
+                React.createElement('div', null,
+                  React.createElement('label', { className: 'form-label' }, 'Client Name'),
+                  React.createElement('input', {
+                    className: 'form-input',
+                    value: formData.client_name,
+                    onChange: (e) => setFormData({ ...formData, client_name: e.target.value }),
+                    placeholder: 'e.g., City of San Jose'
+                  })
+                ),
+                React.createElement('div', { className: 'col-span-2' },
+                  React.createElement('label', { className: 'form-label' }, 'Description'),
+                  React.createElement('textarea', {
+                    className: 'form-textarea',
+                    rows: 4,
+                    value: formData.description,
+                    onChange: (e) => setFormData({ ...formData, description: e.target.value }),
+                    placeholder: 'Project description...'
+                  })
+                )
+              ),
+              React.createElement('div', { className: 'mt-md flex gap-sm justify-end' },
+                React.createElement('button', { type: 'button', className: 'btn', onClick: () => setShowForm(false) }, 'Cancel'),
+                React.createElement('button', { type: 'submit', className: 'btn btn-primary', disabled: saving }, saving ? 'Saving...' : 'Save')
               )
             )
           )
@@ -147,3 +355,6 @@
   </script>
 </body>
 </html>
+
+
+

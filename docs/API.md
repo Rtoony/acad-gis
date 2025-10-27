@@ -8,12 +8,30 @@ Note: If your FastAPI server runs on 5000, set `API_BASE_URL` accordingly.
 - `GET /api/stats` — totals and recent drawings
 
 ## Projects
-- `GET /api/projects` — list projects with drawing counts
-- `GET /api/projects/{project_id}` — project details
-- `GET /api/projects/{project_id}/drawings` — drawings in project
-- `POST /api/projects` — create
-- `PUT /api/projects/{project_id}` — update
-- `DELETE /api/projects/{project_id}` — delete
+- `GET /api/projects` - list projects with drawing counts
+  - `GET /api/projects/{project_id}` - project details
+  - `GET /api/projects/{project_id}/drawings` - drawings in project
+  - `POST /api/projects` - create (201, returns created project)
+  - `PUT /api/projects/{project_id}` - update (returns { success, project })
+  - `DELETE /api/projects/{project_id}` - delete
+    - Soft delete by default: sets `is_archived=true` and `archived_at`
+    - Hard delete with `?hard=true`: cascade remove
+    - Returns `{ success: true, deleted: 'soft' | 'hard' }`
+  - `PUT /api/projects/{project_id}/restore` - restore archived project (returns { success, project })
+
+### Projects Query Parameters
+- `page` (int, default 1)
+- `per_page` (int, default 50)
+- `search` (string, optional; matches name/number/client)
+- `include_archived` (bool, default false)
+
+Response shape:
+- Legacy (no params): returns a plain array of projects
+- With params: returns `{ projects, total, page, per_page, total_pages }`
+
+### Recent Activity
+- `GET /api/recent-activity` - recent projects and drawings with stats (cached ~60s)
+  - Excludes archived projects from `recent_projects` and `total_projects`
 
 ## Drawings
 - `GET /api/drawings` - list

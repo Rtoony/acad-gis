@@ -250,7 +250,7 @@ def root():
 def health_check():
     try:
         with database.get_db_connection() as conn:
-            result = database.execute_single("SELECT COUNT(*) as count FROM projects")
+            result = database.execute_single("SELECT COUNT(*) as count FROM projects WHERE COALESCE(is_archived, false) = false")
             return {
                 "status": "healthy",
                 "database": "connected",
@@ -275,7 +275,7 @@ def get_statistics():
     try:
         stats = {}
         
-        result = database.execute_single("SELECT COUNT(*) as count FROM projects")
+        result = database.execute_single("SELECT COUNT(*) as count FROM projects WHERE COALESCE(is_archived, false) = false")
         stats['total_projects'] = result['count']
         
         result = database.execute_single("SELECT COUNT(*) as count FROM drawings")
@@ -301,20 +301,75 @@ def get_statistics():
 # ============================================
 
 @app.get("/api/projects")
-def get_projects():
-    """Get all projects with drawing counts"""
+def get_projects(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    search: Optional[str] = Query(None),
+    include_archived: bool = Query(False)
+):
+    """Get all projects with drawing counts.
+
+    - Backward compatible: When called with default params (page=1, per_page=50, no search, include_archived=false),
+      returns a plain list like before.
+    - When any of page/per_page/search/include_archived are used intentionally, returns a paginated object.
+    """
     try:
-        query = """
-            SELECT 
-                p.*,
-                COUNT(d.drawing_id) as drawing_count
+        filters = ["1=1"]
+        params: list = []
+        if not include_archived:
+            filters.append("COALESCE(p.is_archived, false) = false")
+
+        if search:
+            filters.append("(p.project_name ILIKE %s OR p.project_number ILIKE %s OR p.client_name ILIKE %s)")
+            like = f"%{search}%"
+            params.extend([like, like, like])
+
+        where_clause = " AND ".join(filters)
+
+        # If the caller is the legacy frontend (no search, default paging, not including archived),
+        # keep returning a flat list for compatibility.
+        legacy_shape = (search is None and page == 1 and per_page == 50 and include_archived is False)
+
+        if legacy_shape:
+            query = f"""
+                SELECT p.*, COUNT(d.drawing_id) as drawing_count
+                FROM projects p
+                LEFT JOIN drawings d ON p.project_id = d.project_id
+                WHERE {where_clause}
+                GROUP BY p.project_id
+                ORDER BY p.created_at DESC
+            """
+            projects = database.execute_query(query, tuple(params))
+            return projects
+
+        # Paginated response
+        total_row = database.execute_single(
+            f"SELECT COUNT(*) AS total FROM projects p WHERE {where_clause}",
+            tuple(params) if params else None
+        )
+        total = total_row['total'] if total_row else 0
+        offset = (page - 1) * per_page
+
+        query = f"""
+            SELECT p.*, COUNT(d.drawing_id) as drawing_count
             FROM projects p
             LEFT JOIN drawings d ON p.project_id = d.project_id
+            WHERE {where_clause}
             GROUP BY p.project_id
             ORDER BY p.created_at DESC
+            LIMIT %s OFFSET %s
         """
-        projects = database.execute_query(query)
-        return projects
+        params_with_page = list(params)
+        params_with_page.extend([per_page, offset])
+        projects = database.execute_query(query, tuple(params_with_page))
+
+        return {
+            "projects": projects,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total + per_page - 1) // per_page
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get projects: {str(e)}")
 
@@ -322,7 +377,18 @@ def get_projects():
 def get_project(project_id: str):
     """Get single project details"""
     try:
-        project = database.get_project(project_id)
+        project = database.execute_single(
+            """
+            SELECT 
+                p.*,
+                COUNT(d.drawing_id) AS drawing_count
+            FROM projects p
+            LEFT JOIN drawings d ON p.project_id = d.project_id
+            WHERE p.project_id = %s
+            GROUP BY p.project_id
+            """,
+            (project_id,)
+        )
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         return project
@@ -331,7 +397,7 @@ def get_project(project_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
 
-@app.post("/api/projects")
+@app.post("/api/projects", status_code=201)
 def create_project(project: ProjectCreate):
     """Create new project"""
     try:
@@ -341,11 +407,17 @@ def create_project(project: ProjectCreate):
             client_name=project.client_name,
             description=project.description
         )
-        
-        return {
-            "project_id": project_id,
-            "message": "Project created successfully"
-        }
+        # Return the newly created project row
+        created = database.execute_single(
+            "SELECT * FROM projects WHERE project_id = %s",
+            (project_id,)
+        )
+        # Invalidate recent activity cache
+        try:
+            _recent_cache["ts"] = 0  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return created or {"project_id": project_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
 
@@ -376,51 +448,153 @@ def update_project(project_id: str, project: ProjectUpdate):
             params.append(project.description)
         
         if not update_fields:
-            return {"message": "No fields to update"}
+            # No-op but respond consistently
+            refreshed = database.execute_single(
+                "SELECT * FROM projects WHERE project_id = %s",
+                (project_id,)
+            )
+            return {"success": True, "project": refreshed}
         
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
         params.append(project_id)
         
         query = f"UPDATE projects SET {', '.join(update_fields)} WHERE project_id = %s"
         database.execute_query(query, tuple(params))
-        
-        return {"message": "Project updated successfully"}
+        # Return the updated row
+        updated = database.execute_single(
+            "SELECT * FROM projects WHERE project_id = %s",
+            (project_id,)
+        )
+        try:
+            _recent_cache["ts"] = 0  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return {"success": True, "project": updated}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update project: {str(e)}")
 
 @app.delete("/api/projects/{project_id}")
-def delete_project(project_id: str):
+def delete_project(project_id: str, hard: bool = Query(False)):
     """Delete project (will cascade to drawings if configured)"""
     try:
         # Check if project exists
         existing = database.get_project(project_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Project not found")
-        
-        # Check if project has drawings
-        drawings = database.execute_query(
-            "SELECT COUNT(*) as count FROM drawings WHERE project_id = %s",
-            (project_id,)
-        )
-        drawing_count = drawings[0]['count'] if drawings else 0
-        
-        if drawing_count > 0:
-            # You might want to prevent deletion or cascade
-            # For now, we'll prevent it and return an error
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cannot delete project with {drawing_count} drawings. Delete drawings first."
+        if hard:
+            # Hard delete: DB-level ON DELETE CASCADE handles children
+            database.execute_query("DELETE FROM projects WHERE project_id = %s", (project_id,), fetch=False)
+            try:
+                _recent_cache["ts"] = 0  # type: ignore[name-defined]
+            except Exception:
+                pass
+            return {"success": True, "deleted": "hard"}
+        else:
+            # Soft delete: mark as archived
+            database.execute_query(
+                "UPDATE projects SET is_archived = true, archived_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE project_id = %s",
+                (project_id,),
+                fetch=False
             )
-        
-        database.execute_query("DELETE FROM projects WHERE project_id = %s", (project_id,))
-        
-        return {"message": "Project deleted successfully"}
+            try:
+                _recent_cache["ts"] = 0  # type: ignore[name-defined]
+            except Exception:
+                pass
+            return {"success": True, "deleted": "soft"}
+
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+
+@app.put("/api/projects/{project_id}/restore")
+def restore_project(project_id: str):
+    """Restore a soft-deleted project (unarchive)."""
+    try:
+        existing = database.get_project(project_id)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        database.execute_query(
+            "UPDATE projects SET is_archived = false, archived_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE project_id = %s",
+            (project_id,),
+            fetch=False
+        )
+        restored = database.execute_single(
+            "SELECT * FROM projects WHERE project_id = %s",
+            (project_id,)
+        )
+        try:
+            _recent_cache["ts"] = 0  # type: ignore[name-defined]
+        except Exception:
+            pass
+        return {"success": True, "project": restored}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to restore project: {str(e)}")
+
+# ============================================
+# RECENT ACTIVITY
+# ============================================
+
+from time import time as _time
+_recent_cache: dict = {"ts": 0, "data": None}
+
+@app.get("/api/recent-activity")
+def get_recent_activity():
+    """Return recent projects, drawings, and basic stats.
+
+    Cached for 60 seconds to reduce load.
+    """
+    try:
+        now = _time()
+        if _recent_cache["data"] is not None and (now - _recent_cache["ts"]) < 60:
+            return _recent_cache["data"]
+
+        recent_projects_rows = database.execute_query(
+            """
+            SELECT p.*, COUNT(d.drawing_id) AS drawing_count
+            FROM projects p
+            LEFT JOIN drawings d ON p.project_id = d.project_id
+            WHERE COALESCE(p.is_archived, false) = false
+            GROUP BY p.project_id
+            ORDER BY p.created_at DESC
+            LIMIT 5
+            """
+        )
+
+        recent_drawings = database.execute_query(
+            """
+            SELECT d.drawing_id, d.drawing_name, d.drawing_number, d.drawing_type,
+                   d.created_at, p.project_name, p.project_number
+            FROM drawings d
+            LEFT JOIN projects p ON d.project_id = p.project_id
+            ORDER BY d.created_at DESC
+            LIMIT 5
+            """
+        )
+
+        stats = {
+            "total_projects": database.execute_single("SELECT COUNT(*) AS c FROM projects WHERE COALESCE(is_archived, false) = false")['c'],
+            "total_drawings": database.execute_single("SELECT COUNT(*) AS c FROM drawings")['c'],
+            "total_layers": database.execute_single("SELECT COUNT(*) AS c FROM layer_standards")['c'],
+            "total_blocks": database.execute_single("SELECT COUNT(*) AS c FROM block_definitions")['c'],
+        }
+
+        payload = {
+            "recent_projects": recent_projects_rows,
+            "recent_drawings": recent_drawings,
+            "stats": stats,
+        }
+
+        _recent_cache["ts"] = now
+        _recent_cache["data"] = payload
+        return payload
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load recent activity: {str(e)}")
 
 # ============================================
 # DRAWINGS - FULL CRUD
