@@ -1,0 +1,164 @@
+{
+  "company_name": "Engineering Solutions Inc.",
+  "map_center": [38.5, -122.8],
+  "initial_zoom": 10,
+  "min_zoom": 3,
+  "max_zoom": 20,
+  "default_basemap": "osm",
+  "basemaps": {
+    "osm": {
+      "name": "OpenStreetMap",
+      "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      "attribution": "&copy; OpenStreetMap contributors"
+    },
+    "grayscale": {
+      "name": "Grayscale",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, HERE, Garmin"
+    },
+    "satellite": {
+      "name": "Satellite",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, Maxar, GeoEye, Earthstar Geographics"
+    },
+    "terrain": {
+      "name": "Terrain",
+      "url": "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+      "attribution": "&copy; OpenTopoMap contributors"
+    },
+    "light": {
+      "name": "Light",
+      "url": "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "dark": {
+      "name": "Dark",
+      "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "streets": {
+      "name": "Streets",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, DeLorme, NAVTEQ"
+    },
+    "watercolor": {
+      "name": "Watercolor (Artistic)",
+      "url": "https://tiles.stadiamaps.com/tiles/stamen_watercolor/{z}/{x}/{y}.jpg",
+      "attribution": "Map tiles by Stamen Design, under CC BY 3.0. Hosted by Stadia Maps"
+    },
+    "voyager": {
+      "name": "Voyager (Balanced)",
+      "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; OpenStreetMap &copy; CARTO"
+    },
+    "topo": {
+      "name": "Topographic (USGS)",
+      "url": "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "USGS"
+    },
+    "hot": {
+      "name": "Humanitarian (HOT)",
+      "url": "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+      "attribution": "&copy; OpenStreetMap contributors, Tiles courtesy of Humanitarian OpenStreetMap Team"
+    },
+    "hybrid": {
+      "name": "Satellite + Labels",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, Maxar, GeoEye"
+    },
+    "darkmatter": {
+      "name": "Midnight (Dark Gray)",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, HERE, Garmin"
+    },
+    "natgeo": {
+      "name": "National Geographic",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, National Geographic"
+    },
+    "positron": {
+      "name": "Alidade Smooth",
+      "url": "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png",
+      "attribution": "&copy; Stadia Maps &copy; OpenMapTiles &copy; OpenStreetMap"
+    },
+    "ocean": {
+      "name": "Ocean Basemap",
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}",
+      "attribution": "Esri, GEBCO, NOAA, NGS"
+    }
+  },
+  "color_schemes": {
+    "brand": {
+      "primary": "#2C5AA0",
+      "secondary": "#4A90E2",
+      "accent": "#F5A623",
+      "success": "#7ED321",
+      "warning": "#F5A623",
+      "danger": "#D0021B"
+    },
+    "standard": {
+      "primary": "#3388ff",
+      "secondary": "#38A9DC",
+      "accent": "#FFC107",
+      "success": "#4CAF50",
+      "warning": "#FF9800",
+      "danger": "#F44336"
+    },
+    "high_contrast": {
+      "primary": "#000000",
+      "secondary": "#333333",
+      "accent": "#FF0000",
+      "success": "#00AA00",
+      "warning": "#FF8800",
+      "danger": "#CC0000"
+    },
+    "vibrant": {
+      "primary": "#E91E63",
+      "secondary": "#9C27B0",
+      "accent": "#00BCD4",
+      "success": "#8BC34A",
+      "warning": "#FF9800",
+      "danger": "#F44336"
+    },
+    "colorblind_friendly": {
+      "primary": "#0173B2",
+      "secondary": "#029E73",
+      "accent": "#ECE133",
+      "success": "#56B4E9",
+      "warning": "#F0E442",
+      "danger": "#DE8F05"
+    }
+  },
+  "project_types": {
+    "infrastructure": {
+      "name": "Infrastructure",
+      "color": "#2C5AA0",
+      "icon": "bridge"
+    },
+    "commercial": {
+      "name": "Commercial",
+      "color": "#4A90E2",
+      "icon": "building"
+    },
+    "residential": {
+      "name": "Residential",
+      "color": "#7ED321",
+      "icon": "home"
+    },
+    "environmental": {
+      "name": "Environmental",
+      "color": "#50C878",
+      "icon": "leaf"
+    },
+    "transportation": {
+      "name": "Transportation",
+      "color": "#F5A623",
+      "icon": "road"
+    },
+    "utilities": {
+      "name": "Utilities",
+      "color": "#D0021B",
+      "icon": "bolt"
+    }
+  }
+}

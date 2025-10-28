@@ -1,0 +1,293 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-001",
+        "name": "Market Street Transit Corridor",
+        "type": "transportation",
+        "infrastructure_type": "rail",
+        "status": "operational",
+        "length": "5.2 miles",
+        "capacity": "50,000 passengers/day",
+        "year_built": "2018"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.79939999999999,
+            38.5049
+          ],
+          [
+            -122.78829999999999,
+            38.5158
+          ],
+          [
+            -122.77879999999999,
+            38.522
+          ],
+          [
+            -122.7691,
+            38.5289
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-002",
+        "name": "Bay Area Water Main - North",
+        "type": "utilities",
+        "infrastructure_type": "water",
+        "status": "operational",
+        "length": "8.7 miles",
+        "capacity": "50 MGD",
+        "year_built": "2015"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.79939999999999,
+            38.539899999999996
+          ],
+          [
+            -122.80829999999999,
+            38.5299
+          ],
+          [
+            -122.8194,
+            38.521899999999995
+          ],
+          [
+            -122.8283,
+            38.5149
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-003",
+        "name": "Peninsula Power Transmission Line",
+        "type": "utilities",
+        "infrastructure_type": "electric",
+        "status": "operational",
+        "length": "12.3 miles",
+        "capacity": "230 kV",
+        "year_built": "2016"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.79939999999999,
+            38.5049
+          ],
+          [
+            -122.7894,
+            38.494899999999994
+          ],
+          [
+            -122.7794,
+            38.484899999999996
+          ],
+          [
+            -122.76939999999999,
+            38.4749
+          ],
+          [
+            -122.7594,
+            38.4649
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-004",
+        "name": "Golden Gate Park Pathway Network",
+        "type": "transportation",
+        "infrastructure_type": "pedestrian",
+        "status": "operational",
+        "length": "6.8 miles",
+        "capacity": "Unlimited",
+        "year_built": "2019"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.8908,
+            38.499399999999994
+          ],
+          [
+            -122.87079999999999,
+            38.499399999999994
+          ],
+          [
+            -122.85079999999999,
+            38.499399999999994
+          ],
+          [
+            -122.8308,
+            38.499399999999994
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-005",
+        "name": "Embarcadero Waterfront Route",
+        "type": "transportation",
+        "infrastructure_type": "multimodal",
+        "status": "operational",
+        "length": "4.5 miles",
+        "capacity": "Mixed use",
+        "year_built": "2020"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.77329999999999,
+            38.538
+          ],
+          [
+            -122.77329999999999,
+            38.529999999999994
+          ],
+          [
+            -122.77329999999999,
+            38.522
+          ],
+          [
+            -122.77329999999999,
+            38.513999999999996
+          ],
+          [
+            -122.77329999999999,
+            38.506
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-006",
+        "name": "Sunset Stormwater Collection System",
+        "type": "utilities",
+        "infrastructure_type": "stormwater",
+        "status": "operational",
+        "length": "7.2 miles",
+        "capacity": "100 MGD",
+        "year_built": "2017"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.8908,
+            38.489399999999996
+          ],
+          [
+            -122.87079999999999,
+            38.489399999999996
+          ],
+          [
+            -122.85079999999999,
+            38.489399999999996
+          ],
+          [
+            -122.8308,
+            38.489399999999996
+          ],
+          [
+            -122.8108,
+            38.489399999999996
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-007",
+        "name": "Mission Bay Fiber Optic Network",
+        "type": "utilities",
+        "infrastructure_type": "telecommunications",
+        "status": "operational",
+        "length": "3.8 miles",
+        "capacity": "100 Gbps",
+        "year_built": "2021"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.7692,
+            38.4999
+          ],
+          [
+            -122.77919999999999,
+            38.4999
+          ],
+          [
+            -122.7892,
+            38.4999
+          ],
+          [
+            -122.7992,
+            38.4999
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "INF-008",
+        "name": "19th Avenue Rapid Transit",
+        "type": "transportation",
+        "infrastructure_type": "bus_rapid_transit",
+        "status": "operational",
+        "length": "9.1 miles",
+        "capacity": "35,000 passengers/day",
+        "year_built": "2019"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -122.8558,
+            38.539899999999996
+          ],
+          [
+            -122.8558,
+            38.5199
+          ],
+          [
+            -122.8558,
+            38.4999
+          ],
+          [
+            -122.8558,
+            38.479899999999994
+          ],
+          [
+            -122.8558,
+            38.4599
+          ]
+        ]
+      }
+    }
+  ]
+}

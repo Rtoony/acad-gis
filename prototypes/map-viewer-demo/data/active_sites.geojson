@@ -1,0 +1,137 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-001",
+        "name": "Bayview Industrial Park",
+        "type": "commercial",
+        "status": "construction",
+        "phase": "Phase 2 of 3",
+        "completion": "75%",
+        "start_date": "2024-01-15",
+        "expected_completion": "2025-06-30",
+        "budget": "$22.5M",
+        "crew_size": 35
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.7714,
+          38.4599
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-002",
+        "name": "Nob Hill Street Improvements",
+        "type": "infrastructure",
+        "status": "planning",
+        "phase": "Design Phase",
+        "completion": "15%",
+        "start_date": "2024-08-01",
+        "expected_completion": "2025-12-31",
+        "budget": "$3.8M",
+        "crew_size": 8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.7961,
+          38.5226
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-003",
+        "name": "Ocean Beach Coastal Protection",
+        "type": "environmental",
+        "status": "construction",
+        "phase": "Phase 1 of 2",
+        "completion": "40%",
+        "start_date": "2024-03-20",
+        "expected_completion": "2025-09-15",
+        "budget": "$6.2M",
+        "crew_size": 16
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.8908,
+          38.489399999999996
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-004",
+        "name": "Potrero Hill Power Grid Upgrade",
+        "type": "utilities",
+        "status": "construction",
+        "phase": "Phase 3 of 4",
+        "completion": "85%",
+        "start_date": "2023-09-10",
+        "expected_completion": "2025-02-28",
+        "budget": "$9.1M",
+        "crew_size": 24
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.7778,
+          38.488699999999994
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-005",
+        "name": "Haight-Ashbury Transit Station",
+        "type": "transportation",
+        "status": "design",
+        "phase": "Preliminary Design",
+        "completion": "25%",
+        "start_date": "2024-06-01",
+        "expected_completion": "2026-03-31",
+        "budget": "$14.7M",
+        "crew_size": 12
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.8277,
+          38.4997
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "AS-006",
+        "name": "Chinatown Cultural Center",
+        "type": "commercial",
+        "status": "permitting",
+        "phase": "Permit Review",
+        "completion": "10%",
+        "start_date": "2024-09-15",
+        "expected_completion": "2026-08-31",
+        "budget": "$18.3M",
+        "crew_size": 5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -122.78659999999999,
+          38.5241
+        ]
+      }
+    }
+  ]
+}

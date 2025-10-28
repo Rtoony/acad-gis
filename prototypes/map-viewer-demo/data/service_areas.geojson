@@ -1,0 +1,119 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-001",
+        "name": "Primary Service Area",
+        "type": "primary",
+        "description": "Main service coverage area - Sonoma County",
+        "population": "500,000",
+        "established": "2010"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.895,
+              38.54
+            ],
+            [
+              -122.895,
+              38.434999999999995
+            ],
+            [
+              -122.735,
+              38.434999999999995
+            ],
+            [
+              -122.735,
+              38.54
+            ],
+            [
+              -122.895,
+              38.54
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-002",
+        "name": "North County Expansion Area",
+        "type": "expansion",
+        "description": "Planned expansion - Healdsburg and surrounding areas",
+        "population": "150,000",
+        "established": "2022"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.735,
+              38.58
+            ],
+            [
+              -122.735,
+              38.48
+            ],
+            [
+              -122.53,
+              38.48
+            ],
+            [
+              -122.53,
+              38.58
+            ],
+            [
+              -122.735,
+              38.58
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "SA-003",
+        "name": "South County Service Zone",
+        "type": "secondary",
+        "description": "Secondary service area - Petaluma and Novato",
+        "population": "180,000",
+        "established": "2018"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.88,
+              38.434999999999995
+            ],
+            [
+              -122.88,
+              38.279999999999994
+            ],
+            [
+              -122.63,
+              38.279999999999994
+            ],
+            [
+              -122.63,
+              38.434999999999995
+            ],
+            [
+              -122.88,
+              38.434999999999995
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
