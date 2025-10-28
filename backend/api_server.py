@@ -34,11 +34,13 @@ if __package__ in (None, ""):
     sys.path.append(str(Path(__file__).resolve().parent))
     import database  # type: ignore
     from import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+    from dxf_exporter import DXFExporter  # type: ignore
     from validators.pipe_network import validate_pipe_network, Severity  # type: ignore
     from validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
 else:
     from . import database  # type: ignore
     from .import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
+    from .dxf_exporter import DXFExporter  # type: ignore
     from .validators.pipe_network import validate_pipe_network, Severity  # type: ignore
     from .validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
 
@@ -1138,6 +1140,78 @@ async def import_dxf(
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+class DXFExportRequest(BaseModel):
+    drawing_id: str
+    dxf_version: Optional[str] = "AC1027"
+    include_modelspace: Optional[bool] = True
+    include_paperspace: Optional[bool] = True
+    layer_filter: Optional[List[str]] = None
+
+
+@app.post("/api/dxf/export")
+def export_dxf(request: DXFExportRequest):
+    """Export a drawing to a DXF file and return metadata about the file."""
+    try:
+        drawing = database.get_drawing(request.drawing_id)
+        if not drawing:
+            raise HTTPException(status_code=404, detail="Drawing not found")
+
+        # Build output path in system temp dir
+        import uuid as _uuid
+        import tempfile
+        export_name = f"drawing_{request.drawing_id}_{_uuid.uuid4().hex[:8]}.dxf"
+        output_path = os.path.join(tempfile.gettempdir(), export_name)
+
+        exporter = DXFExporter()
+        stats = exporter.export_dxf(
+            drawing_id=request.drawing_id,
+            output_path=output_path,
+            dxf_version=request.dxf_version or "AC1027",
+            include_modelspace=bool(request.include_modelspace),
+            include_paperspace=bool(request.include_paperspace),
+            layer_filter=request.layer_filter,
+        )
+
+        file_size = 0
+        try:
+            file_size = os.path.getsize(output_path)
+        except OSError:
+            pass
+
+        return {
+            "success": len(stats.get("errors", [])) == 0,
+            "file_path": output_path,
+            "filename": export_name,
+            "file_size": file_size,
+            "stats": stats,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export DXF: {str(e)}")
+
+
+@app.get("/api/dxf/export/download")
+def download_dxf(path: str):
+    """Download an exported DXF from a temp path returned by /api/dxf/export.
+
+    To mitigate path traversal, only serves files from the system temp directory.
+    """
+    try:
+        import tempfile
+        tempdir = os.path.abspath(tempfile.gettempdir())
+        requested = os.path.abspath(path)
+        if not requested.startswith(tempdir + os.sep):
+            raise HTTPException(status_code=400, detail="Invalid export path")
+        if not os.path.exists(requested):
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(requested, media_type="application/dxf", filename=os.path.basename(requested))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download export: {str(e)}")
 
 @app.get("/api/export/{drawing_id}")
 def export_drawing(drawing_id: str, format: str = "dxf"):
