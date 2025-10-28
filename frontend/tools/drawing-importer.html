@@ -42,6 +42,7 @@
       list: async () => [],
       uploadWithProgress: async () => ({}),
     };
+    const API_BASE = (typeof API_BASE_URL !== 'undefined') ? API_BASE_URL : 'http://localhost:8000/api';
 
     const extractNumericEpsg = (value = '') => {
       const match = (value || '').match(/(\d{3,6})/);
@@ -58,6 +59,7 @@
       const [uploading, setUploading] = useState(false);
       const [error, setError] = useState('');
       const [results, setResults] = useState([]);
+      const [exportingId, setExportingId] = useState('');
 
       useEffect(() => {
         (async () => {
@@ -115,6 +117,32 @@
         } finally {
           setResults(summary);
           setUploading(false);
+        }
+      };
+
+      const exportOne = async (drawingId) => {
+        if (!drawingId) return;
+        setExportingId(drawingId);
+        try {
+          const payload = {
+            drawing_id: drawingId,
+            dxf_version: 'AC1027',
+            include_modelspace: true,
+            include_paperspace: true,
+          };
+          const res = await API.request('POST', '/dxf/export', { data: payload });
+          if (!res || !res.file_path) {
+            throw new Error('Export failed: no file returned');
+          }
+          const url = `${API_BASE}/dxf/export/download?path=${encodeURIComponent(res.file_path)}`;
+          // Trigger download in a new tab (safer across browsers)
+          window.open(url, '_blank');
+          Toast.success(`Export ready: ${res.filename || 'download.dxf'}`);
+        } catch (e) {
+          console.error(e);
+          Toast.error(e.message || 'Export failed');
+        } finally {
+          setExportingId('');
         }
       };
 
@@ -180,7 +208,14 @@
                 results.length > 0 && React.createElement('div', { className: 'mt-md' },
                   React.createElement('div', { className: 'card-subtitle text-muted mb-sm' }, 'Recent Imports'),
                   React.createElement('ul', { className: 'small' }, results.map((r, idx) =>
-                    React.createElement('li', { key: r.drawingId || `${r.file}-${idx}` }, `${r.file} → ${r.drawingName || 'new drawing'} | Canonical: ${r.stats?.canonical_features ?? 0} | EPSG:${r.epsg || '—'}`)
+                    React.createElement('li', { key: r.drawingId || `${r.file}-${idx}`, className: 'flex', style: { alignItems: 'center', gap: '8px', justifyContent: 'space-between' } },
+                      React.createElement('span', null, `${r.file} → ${r.drawingName || 'new drawing'} | Canonical: ${r.stats?.canonical_features ?? 0} | EPSG:${r.epsg || '—'}`),
+                      r.drawingId && React.createElement('button', {
+                        className: 'btn btn-ghost',
+                        disabled: uploading || exportingId === r.drawingId,
+                        onClick: () => exportOne(r.drawingId)
+                      }, exportingId === r.drawingId ? 'Exporting…' : 'Export DXF')
+                    )
                   ))
                 ),
                 React.createElement('div', { className: 'card-footer flex', style: { justifyContent: 'flex-end', gap: '8px' } },
