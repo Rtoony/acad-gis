@@ -599,6 +599,100 @@ def get_recent_activity():
         raise HTTPException(status_code=500, detail=f"Failed to load recent activity: {str(e)}")
 
 # ============================================
+# GEO FEATURES - Map Viewer Integration
+# ============================================
+
+@app.get("/api/projects/{project_id}/features")
+def get_project_features(
+    project_id: str,
+    feature_type: Optional[str] = Query(None, description="Filter by feature type (e.g., QA_POINT, QA_LINE, QA_AREA)"),
+    layer_name: Optional[str] = Query(None, description="Filter by layer name")
+):
+    """
+    Get all geo features for a project as GeoJSON FeatureCollection.
+
+    Features are sourced from the canonical_features table which contains
+    geometries already transformed to EPSG:4326 (WGS84) for web display.
+
+    Query params:
+    - feature_type: Filter by feature type
+    - layer_name: Filter by CAD layer name
+
+    Returns GeoJSON FeatureCollection with properties for styling.
+    """
+    try:
+        # Build query with optional filters
+        query = """
+            SELECT
+                feature_id,
+                feature_type,
+                layer_name,
+                metadata,
+                ST_AsGeoJSON(geom)::json as geometry
+            FROM canonical_features
+            WHERE project_id = %s
+        """
+        params = [project_id]
+
+        if feature_type:
+            query += " AND feature_type = %s"
+            params.append(feature_type)
+
+        if layer_name:
+            query += " AND layer_name = %s"
+            params.append(layer_name)
+
+        query += " ORDER BY feature_type, layer_name"
+
+        features = database.execute_query(query, tuple(params))
+
+        # Convert to GeoJSON FeatureCollection
+        geojson_features = []
+        for feature in features:
+            geojson_features.append({
+                "type": "Feature",
+                "id": feature['feature_id'],
+                "geometry": feature['geometry'],
+                "properties": {
+                    "feature_type": feature['feature_type'],
+                    "layer_name": feature['layer_name'],
+                    "metadata": feature['metadata']
+                }
+            })
+
+        return {
+            "type": "FeatureCollection",
+            "features": geojson_features
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get project features: {str(e)}")
+
+@app.get("/api/projects/{project_id}/features/types")
+def get_project_feature_types(project_id: str):
+    """
+    Get list of feature types available for a project.
+    Useful for building layer controls in the map viewer.
+    """
+    try:
+        query = """
+            SELECT
+                feature_type,
+                COUNT(*) as count,
+                array_agg(DISTINCT layer_name) as layers
+            FROM canonical_features
+            WHERE project_id = %s
+            GROUP BY feature_type
+            ORDER BY feature_type
+        """
+
+        types = database.execute_query(query, (project_id,))
+        return types
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get feature types: {str(e)}")
+
+# ============================================
 # DRAWINGS - FULL CRUD
 # ============================================
 

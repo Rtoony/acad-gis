@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>San Francisco Landmarks</name>
+    <description>Sample landmarks for testing KML import</description>
+    <Placemark>
+      <name>Transamerica Pyramid</name>
+      <description>Iconic skyscraper in San Francisco's Financial District</description>
+      <Point>
+        <coordinates>-122.4029,37.7952,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Painted Ladies</name>
+      <description>Row of colorful Victorian houses</description>
+      <Point>
+        <coordinates>-122.4330,37.7762,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Fisherman's Wharf</name>
+      <description>Popular waterfront tourist attraction</description>
+      <Point>
+        <coordinates>-122.4177,37.8080,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Chinatown Gate</name>
+      <description>Entrance to San Francisco's Chinatown</description>
+      <Point>
+        <coordinates>-122.4056,37.7909,0</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>AT&T Park</name>
+      <description>Home of the San Francisco Giants</description>
+      <Point>
+        <coordinates>-122.3892,37.7786,0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>

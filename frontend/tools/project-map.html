@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Map | ACAD-GIS</title>
+  <link rel="stylesheet" href="../shared/styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Esri Leaflet for ArcGIS Services -->
+  <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+  <style>
+    #map {
+      height: calc(100vh - 280px);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .input, select.input {
+      background: rgba(15,23,42,0.8);
+      color: #e0e7ff;
+      border: 1px solid rgba(59,130,246,0.35);
+      padding: 8px 12px;
+      border-radius: 8px;
+      min-width: 200px;
+    }
+    .btn-secondary {
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.35);
+      color: #60a5fa;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(59,130,246,0.25);
+      border-color: rgba(59,130,246,0.5);
+    }
+    .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .layer-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(15,23,42,0.6);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 8px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .layer-toggle:hover {
+      background: rgba(15,23,42,0.8);
+      border-color: rgba(59,130,246,0.4);
+    }
+    .layer-toggle.active {
+      background: rgba(59,130,246,0.15);
+      border-color: rgba(59,130,246,0.5);
+    }
+    .layer-toggle input[type="checkbox"] {
+      margin: 0;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      color: var(--color-text-secondary);
+      font-size: 0.85rem;
+      padding-top: 12px;
+      border-top: 1px solid rgba(59,130,246,0.15);
+      margin-top: 12px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .coordinate-display {
+      font-family: 'Courier New', monospace;
+      color: #60a5fa;
+    }
+    .control-panel {
+      background: rgba(15,23,42,0.95);
+      border: 1px solid rgba(59,130,246,0.35);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+      max-width: 400px;
+    }
+    .control-panel h3 {
+      margin: 0 0 12px 0;
+      font-size: 1rem;
+      color: #60a5fa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-group {
+      margin-bottom: 12px;
+    }
+    .control-group label {
+      display: block;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 6px;
+    }
+    .control-group input[type="text"],
+    .control-group input[type="number"] {
+      width: 100%;
+      background: rgba(15,23,42,0.8);
+      color: #e0e7ff;
+      border: 1px solid rgba(59,130,246,0.35);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+    }
+    .control-group input[type="text"]:focus,
+    .control-group input[type="number"]:focus {
+      outline: none;
+      border-color: rgba(59,130,246,0.6);
+    }
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+    .btn-primary {
+      background: rgba(59,130,246,0.2);
+      border: 1px solid rgba(59,130,246,0.4);
+      color: #60a5fa;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      background: rgba(59,130,246,0.3);
+      border-color: rgba(59,130,246,0.6);
+    }
+    .btn-danger {
+      background: rgba(239,68,68,0.2);
+      border: 1px solid rgba(239,68,68,0.4);
+      color: #f87171;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .btn-danger:hover {
+      background: rgba(239,68,68,0.3);
+      border-color: rgba(239,68,68,0.6);
+    }
+    .layer-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px;
+      margin: 4px 0;
+      background: rgba(15,23,42,0.5);
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .measurement-result {
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+    }
+    .result-label {
+      color: var(--color-text-secondary);
+      font-size: 0.875rem;
+    }
+    .result-value {
+      color: #60a5fa;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+    .search-result-item {
+      padding: 10px;
+      margin: 6px 0;
+      background: rgba(15,23,42,0.5);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .search-result-item:hover {
+      background: rgba(15,23,42,0.8);
+      border-color: rgba(59,130,246,0.4);
+    }
+    .search-result-name {
+      font-weight: 600;
+      color: #60a5fa;
+      margin-bottom: 4px;
+    }
+    .search-result-address {
+      font-size: 0.8rem;
+      color: var(--color-text-secondary);
+    }
+    .instruction {
+      color: var(--color-text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+      text-align: center;
+      padding: 12px;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(59,130,246,0.2);
+    }
+    .tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab:hover {
+      color: #60a5fa;
+    }
+    .tab.active {
+      color: #60a5fa;
+      border-bottom-color: #60a5fa;
+    }
+    .basemap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .basemap-option {
+      aspect-ratio: 1;
+      border: 2px solid rgba(59,130,246,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: all 0.2s;
+      background-size: cover;
+      background-position: center;
+    }
+    .basemap-option:hover {
+      border-color: rgba(59,130,246,0.5);
+      transform: translateY(-2px);
+    }
+    .basemap-option.active {
+      border-color: #60a5fa;
+      border-width: 3px;
+    }
+    .basemap-option-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 4px;
+      font-size: 0.7rem;
+      text-align: center;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-container input[type="range"] {
+      flex: 1;
+      height: 4px;
+      background: rgba(59,130,246,0.2);
+      border-radius: 2px;
+      outline: none;
+    }
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #60a5fa;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider-container span {
+      min-width: 45px;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+    }
+    select.form-select {
+      width: 100%;
+      background: rgba(15,23,42,0.8);
+      color: #e0e7ff;
+      border: 1px solid rgba(59,130,246,0.35);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+    }
+    .legend-box {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      background: rgba(15,23,42,0.95);
+      border: 1px solid rgba(59,130,246,0.35);
+      border-radius: 8px;
+      padding: 12px;
+      max-width: 200px;
+      z-index: 1000;
+    }
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #60a5fa;
+      font-size: 0.9rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+      font-size: 0.8rem;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="grid-background">
+  <div id="root"></div>
+
+  <script src="../shared/components.js"></script>
+  <script src="../shared/react-components.js"></script>
+  <script src="../shared/api.js"></script>
+  <script type="text/babel">
+    const { useEffect, useRef, useState, useCallback } = React;
+    const HeaderComp = window.Header || (({ title, subtitle }) => (
+      React.createElement('header', { className: 'header' },
+        React.createElement('div', { className: 'header-content' },
+          React.createElement('div', { className: 'header-title' },
+            React.createElement('h1', null, title || 'Project Map'),
+            subtitle && React.createElement('div', { className: 'header-subtitle' }, subtitle)
+          )
+        )
+      )
+    ));
+
+    // Basemap configuration
+    const BASEMAP_OPTIONS = {
+      osm: {
+        name: 'OpenStreetMap',
+        url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenStreetMap contributors',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZjRmNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk9TTTwvdGV4dD48L3N2Zz4='
+      },
+      esri_world: {
+        name: 'Esri Imagery',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri, Maxar',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzRhNmE0YSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5TYXRlbGxpdGU8L3RleHQ+PC9zdmc+'
+      },
+      esri_topo: {
+        name: 'Esri Topo',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y0ZTRkNCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRvcG88L3RleHQ+PC9zdmc+'
+      },
+      esri_street: {
+        name: 'Esri Streets',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y4ZjhmOCIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlN0cmVldHM8L3RleHQ+PC9zdmc+'
+      },
+      dark: {
+        name: 'Dark Mode',
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; OpenStreetMap, &copy; CartoDB',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzFhMWExYSIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMiIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5EYXJrPC90ZXh0Pjwvc3ZnPg=='
+      },
+      terrain: {
+        name: 'Terrain',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenTopoMap',
+        thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2QyYjQ4YyIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRlcnJhaW48L3RleHQ+PC9zdmc+'
+      }
+    };
+
+    // Color scheme configurations
+    const COLOR_SCHEMES = {
+      standard: {
+        QA_POINT: '#3b82f6',
+        QA_LINE: '#ef4444',
+        QA_AREA: '#22c55e',
+        DEFAULT: '#94a3b8'
+      },
+      vibrant: {
+        QA_POINT: '#8b5cf6',
+        QA_LINE: '#f59e0b',
+        QA_AREA: '#10b981',
+        DEFAULT: '#6b7280'
+      },
+      high_contrast: {
+        QA_POINT: '#000000',
+        QA_LINE: '#ff0000',
+        QA_AREA: '#00ff00',
+        DEFAULT: '#666666'
+      },
+      colorblind_friendly: {
+        QA_POINT: '#0173b2',
+        QA_LINE: '#de8f05',
+        QA_AREA: '#029e73',
+        DEFAULT: '#949494'
+      }
+    };
+
+    // External layer services configuration
+    const EXTERNAL_LAYER_SERVICES = {
+      sonoma_parcels: {
+        name: 'Sonoma County Parcels',
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/CRAPublic/ParcelsPublic/FeatureServer/0',
+        attribution: 'Sonoma County GIS',
+        minZoom: 13,
+        style: { color: '#ff6b6b', weight: 2, fillOpacity: 0.1 }
+      },
+      sonoma_roads: {
+        name: 'Sonoma County Streets',
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/TPWPublic/Streets_Roads/FeatureServer/0',
+        attribution: 'Sonoma County GIS',
+        style: { color: '#4ecdc4', weight: 2, opacity: 0.8 }
+      },
+      sonoma_buildings: {
+        name: 'Sonoma County Buildings',
+        type: 'featureserver',
+        url: 'https://socogis.sonomacounty.ca.gov/map/rest/services/BASEPublic/Buildings/FeatureServer/0',
+        attribution: 'Sonoma County GIS',
+        style: { color: '#95e1d3', weight: 1, fillColor: '#95e1d3', fillOpacity: 0.3 }
+      },
+      ca_cadastral: {
+        name: 'CA Cadastral Survey (BLM)',
+        type: 'wms',
+        url: 'https://gis.blm.gov/arcgis/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/WMSServer',
+        layers: '1,2',
+        format: 'image/png',
+        transparent: true,
+        attribution: 'BLM'
+      }
+    };
+
+    // Feature type styling configuration
+    const FEATURE_STYLES = {
+      'QA_POINT': {
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        radius: 6,
+        weight: 2,
+        fillOpacity: 0.7,
+        label: 'QA Points'
+      },
+      'QA_LINE': {
+        color: '#ef4444',
+        weight: 3,
+        opacity: 0.8,
+        label: 'QA Lines'
+      },
+      'QA_AREA': {
+        color: '#22c55e',
+        fillColor: '#22c55e',
+        weight: 2,
+        fillOpacity: 0.3,
+        opacity: 0.8,
+        label: 'QA Areas'
+      },
+      'DEFAULT': {
+        color: '#94a3b8',
+        fillColor: '#94a3b8',
+        radius: 5,
+        weight: 2,
+        fillOpacity: 0.5,
+        label: 'Other'
+      }
+    };
+
+    function ProjectMap() {
+      const mapRef = useRef(null);
+      const mapEl = useRef(null);
+      const featureLayerRef = useRef(null);
+      const externalLayersRef = useRef({});
+      const measurementLayerRef = useRef(null);
+      const measurementClickHandlerRef = useRef(null);
+      const searchMarkerRef = useRef(null);
+      const apiClient = window.API;
+
+      const [projects, setProjects] = useState([]);
+      const [selectedProject, setSelectedProject] = useState('');
+      const [projectData, setProjectData] = useState(null);
+      const [featureTypes, setFeatureTypes] = useState([]);
+      const [visibleLayers, setVisibleLayers] = useState(new Set());
+      const [loading, setLoading] = useState(false);
+      const [featureCount, setFeatureCount] = useState(0);
+      const [mouseCoords, setMouseCoords] = useState(null);
+      const [error, setError] = useState(null);
+
+      // New state for additional features
+      const [activeTab, setActiveTab] = useState('layers');
+      const [activeExternalLayers, setActiveExternalLayers] = useState(new Set());
+      const [customWmsUrl, setCustomWmsUrl] = useState('');
+      const [customWmsLayers, setCustomWmsLayers] = useState('');
+      const [customWmsName, setCustomWmsName] = useState('');
+      const [measurementMode, setMeasurementMode] = useState('distance');
+      const [measurementPoints, setMeasurementPoints] = useState([]);
+      const [measurementResult, setMeasurementResult] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [searchResults, setSearchResults] = useState([]);
+      const [searchLoading, setSearchLoading] = useState(false);
+
+      // Basemap & styling state
+      const [currentBasemap, setCurrentBasemap] = useState('osm');
+      const [basemapOpacity, setBasemapOpacity] = useState(100);
+      const [hideBasemap, setHideBasemap] = useState(false);
+      const [colorScheme, setColorScheme] = useState('standard');
+      const [markerSize, setMarkerSize] = useState('medium');
+      const [fontSize, setFontSize] = useState('medium');
+      const [layerOpacity, setLayerOpacity] = useState(85);
+
+      // Display state
+      const [showLegend, setShowLegend] = useState(true);
+      const [showScale, setShowScale] = useState(true);
+      const [showAttribution, setShowAttribution] = useState(true);
+
+      // Presets state
+      const [savedPresets, setSavedPresets] = useState([]);
+      const [presetName, setPresetName] = useState('');
+
+      // Advanced tools state
+      const [isFullscreen, setIsFullscreen] = useState(false);
+
+      // Refs for basemap layer
+      const basemapLayerRef = useRef(null);
+
+      // Predefined presets
+      const DEFAULT_PRESETS = [
+        {
+          id: 'standard',
+          name: 'Standard View',
+          description: 'Default balanced view with OSM basemap',
+          config: {
+            basemap: 'osm',
+            basemapOpacity: 100,
+            hideBasemap: false,
+            colorScheme: 'standard',
+            markerSize: 'medium',
+            layerOpacity: 85,
+            showLegend: true,
+            showScale: true,
+            showAttribution: true
+          }
+        },
+        {
+          id: 'satellite',
+          name: 'Satellite View',
+          description: 'High-contrast features on satellite imagery',
+          config: {
+            basemap: 'esri_world',
+            basemapOpacity: 100,
+            hideBasemap: false,
+            colorScheme: 'high_contrast',
+            markerSize: 'large',
+            layerOpacity: 90,
+            showLegend: true,
+            showScale: true,
+            showAttribution: true
+          }
+        },
+        {
+          id: 'presentation',
+          name: 'Presentation Mode',
+          description: 'Vibrant colors on clean basemap for presentations',
+          config: {
+            basemap: 'esri_street',
+            basemapOpacity: 70,
+            hideBasemap: false,
+            colorScheme: 'vibrant',
+            markerSize: 'large',
+            layerOpacity: 95,
+            showLegend: true,
+            showScale: false,
+            showAttribution: false
+          }
+        },
+        {
+          id: 'minimal',
+          name: 'Minimal View',
+          description: 'Focus on data with minimal distractions',
+          config: {
+            basemap: 'osm',
+            basemapOpacity: 50,
+            hideBasemap: false,
+            colorScheme: 'standard',
+            markerSize: 'medium',
+            layerOpacity: 100,
+            showLegend: false,
+            showScale: false,
+            showAttribution: false
+          }
+        }
+      ];
+
+      // Load projects on mount
+      useEffect(() => {
+        async function loadProjects() {
+          try {
+            const data = await apiClient.request('GET', '/projects');
+            setProjects(data || []);
+          } catch (err) {
+            console.error('Failed to load projects:', err);
+            setError('Failed to load projects');
+          }
+        }
+        loadProjects();
+      }, []);
+
+      // Initialize map
+      useEffect(() => {
+        if (mapRef.current || !mapEl.current) return;
+
+        const basemapConfig = BASEMAP_OPTIONS[currentBasemap];
+        const basemapLayer = L.tileLayer(basemapConfig.url, {
+          maxZoom: 20,
+          attribution: basemapConfig.attribution,
+          opacity: basemapOpacity / 100
+        });
+
+        const map = L.map(mapEl.current, {
+          center: [38.4405, -122.7144], // Santa Rosa, CA
+          zoom: 12,
+          layers: [basemapLayer],
+          zoomControl: false
+        });
+
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        L.control.scale({ position: 'bottomleft' }).addTo(map);
+
+        // Track mouse coordinates
+        map.on('mousemove', (e) => {
+          setMouseCoords({
+            lat: e.latlng.lat.toFixed(6),
+            lng: e.latlng.lng.toFixed(6)
+          });
+        });
+
+        mapRef.current = map;
+        basemapLayerRef.current = basemapLayer;
+
+        return () => {
+          map.remove();
+          mapRef.current = null;
+        };
+      }, []);
+
+      // Handle basemap changes
+      useEffect(() => {
+        if (!mapRef.current) return;
+
+        const basemapConfig = BASEMAP_OPTIONS[currentBasemap];
+        if (basemapLayerRef.current) {
+          mapRef.current.removeLayer(basemapLayerRef.current);
+        }
+
+        if (!hideBasemap) {
+          const newBasemap = L.tileLayer(basemapConfig.url, {
+            maxZoom: 20,
+            attribution: basemapConfig.attribution,
+            opacity: basemapOpacity / 100
+          });
+          newBasemap.addTo(mapRef.current);
+          basemapLayerRef.current = newBasemap;
+        }
+      }, [currentBasemap, hideBasemap]);
+
+      // Handle basemap opacity changes
+      useEffect(() => {
+        if (basemapLayerRef.current) {
+          basemapLayerRef.current.setOpacity(basemapOpacity / 100);
+        }
+      }, [basemapOpacity]);
+
+      // Load project features
+      useEffect(() => {
+        if (!selectedProject || !mapRef.current) return;
+
+        async function loadProjectFeatures() {
+          setLoading(true);
+          setError(null);
+
+          try {
+            // Load feature types
+            const types = await apiClient.request('GET', `/projects/${selectedProject}/features/types`);
+            setFeatureTypes(types || []);
+
+            // Initialize visible layers (all on by default)
+            const typeNames = new Set((types || []).map(t => t.feature_type));
+            setVisibleLayers(typeNames);
+
+            // Load all features
+            const geojson = await apiClient.request('GET', `/projects/${selectedProject}/features`);
+            setProjectData(geojson);
+            setFeatureCount(geojson?.features?.length || 0);
+
+            // Clear existing layer
+            if (featureLayerRef.current) {
+              mapRef.current.removeLayer(featureLayerRef.current);
+            }
+
+            // Add GeoJSON layer
+            const sizeMultiplier = getMarkerSizeMultiplier();
+            const layer = L.geoJSON(geojson, {
+              style: (feature) => {
+                const featureType = feature.properties.feature_type;
+                const color = getFeatureColor(featureType);
+                const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                return {
+                  color: color,
+                  fillColor: color,
+                  weight: baseStyle.weight,
+                  fillOpacity: (baseStyle.fillOpacity || 0.5) * (layerOpacity / 100),
+                  opacity: (baseStyle.opacity || 0.8) * (layerOpacity / 100)
+                };
+              },
+              pointToLayer: (feature, latlng) => {
+                const featureType = feature.properties.feature_type;
+                const color = getFeatureColor(featureType);
+                const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+                return L.circleMarker(latlng, {
+                  radius: (baseStyle.radius || 5) * sizeMultiplier,
+                  color: color,
+                  fillColor: color,
+                  weight: baseStyle.weight,
+                  fillOpacity: (baseStyle.fillOpacity || 0.7) * (layerOpacity / 100)
+                });
+              },
+              onEachFeature: (feature, layer) => {
+                const props = feature.properties;
+                const popupContent = `
+                  <div style="font-size: 0.875rem;">
+                    <strong>Type:</strong> ${props.feature_type}<br>
+                    <strong>Layer:</strong> ${props.layer_name || 'N/A'}<br>
+                    ${props.metadata ? `<strong>Metadata:</strong> ${JSON.stringify(props.metadata, null, 2)}` : ''}
+                  </div>
+                `;
+                layer.bindPopup(popupContent);
+              },
+              filter: (feature) => {
+                return visibleLayers.has(feature.properties.feature_type);
+              }
+            }).addTo(mapRef.current);
+
+            featureLayerRef.current = layer;
+
+            // Fit bounds to features
+            if (geojson?.features?.length > 0) {
+              const bounds = layer.getBounds();
+              mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+            }
+
+          } catch (err) {
+            console.error('Failed to load project features:', err);
+            setError(err.message || 'Failed to load project features');
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        loadProjectFeatures();
+      }, [selectedProject]);
+
+      // Update layer visibility
+      useEffect(() => {
+        if (!projectData || !mapRef.current) return;
+
+        // Clear existing layer
+        if (featureLayerRef.current) {
+          mapRef.current.removeLayer(featureLayerRef.current);
+        }
+
+        // Re-add with updated filter
+        const sizeMultiplier = getMarkerSizeMultiplier();
+        const layer = L.geoJSON(projectData, {
+          style: (feature) => {
+            const featureType = feature.properties.feature_type;
+            const color = getFeatureColor(featureType);
+            const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            return {
+              color: color,
+              fillColor: color,
+              weight: baseStyle.weight,
+              fillOpacity: (baseStyle.fillOpacity || 0.5) * (layerOpacity / 100),
+              opacity: (baseStyle.opacity || 0.8) * (layerOpacity / 100)
+            };
+          },
+          pointToLayer: (feature, latlng) => {
+            const featureType = feature.properties.feature_type;
+            const color = getFeatureColor(featureType);
+            const baseStyle = FEATURE_STYLES[featureType] || FEATURE_STYLES.DEFAULT;
+            return L.circleMarker(latlng, {
+              radius: (baseStyle.radius || 5) * sizeMultiplier,
+              color: color,
+              fillColor: color,
+              weight: baseStyle.weight,
+              fillOpacity: (baseStyle.fillOpacity || 0.7) * (layerOpacity / 100)
+            });
+          },
+          onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            const popupContent = `
+              <div style="font-size: 0.875rem;">
+                <strong>Type:</strong> ${props.feature_type}<br>
+                <strong>Layer:</strong> ${props.layer_name || 'N/A'}<br>
+                ${props.metadata ? `<strong>Metadata:</strong> ${JSON.stringify(props.metadata, null, 2)}` : ''}
+              </div>
+            `;
+            layer.bindPopup(popupContent);
+          },
+          filter: (feature) => {
+            return visibleLayers.has(feature.properties.feature_type);
+          }
+        }).addTo(mapRef.current);
+
+        featureLayerRef.current = layer;
+
+      }, [visibleLayers, projectData, colorScheme, markerSize, layerOpacity]);
+
+      // Helper function to get color based on current scheme
+      const getFeatureColor = useCallback((featureType) => {
+        const scheme = COLOR_SCHEMES[colorScheme] || COLOR_SCHEMES.standard;
+        return scheme[featureType] || scheme.DEFAULT;
+      }, [colorScheme]);
+
+      // Helper function to get marker size multiplier
+      const getMarkerSizeMultiplier = useCallback(() => {
+        switch (markerSize) {
+          case 'small': return 0.7;
+          case 'large': return 1.3;
+          default: return 1;
+        }
+      }, [markerSize]);
+
+      const toggleLayer = useCallback((featureType) => {
+        setVisibleLayers(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(featureType)) {
+            newSet.delete(featureType);
+          } else {
+            newSet.add(featureType);
+          }
+          return newSet;
+        });
+      }, []);
+
+      const handleZoomToExtent = useCallback(() => {
+        if (featureLayerRef.current) {
+          const bounds = featureLayerRef.current.getBounds();
+          mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+        }
+      }, []);
+
+      // External layer functions
+      const toggleExternalLayer = useCallback((layerId) => {
+        setActiveExternalLayers(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(layerId)) {
+            newSet.delete(layerId);
+            // Remove from map
+            if (externalLayersRef.current[layerId]) {
+              mapRef.current.removeLayer(externalLayersRef.current[layerId]);
+              delete externalLayersRef.current[layerId];
+            }
+          } else {
+            newSet.add(layerId);
+            // Add to map
+            const service = EXTERNAL_LAYER_SERVICES[layerId];
+            if (service && mapRef.current) {
+              addExternalLayer(layerId, service);
+            }
+          }
+          return newSet;
+        });
+      }, []);
+
+      const addExternalLayer = useCallback((layerId, service) => {
+        if (!mapRef.current || !service) return;
+
+        let layer;
+        if (service.type === 'wms') {
+          layer = L.tileLayer.wms(service.url, {
+            layers: service.layers,
+            format: service.format,
+            transparent: service.transparent,
+            attribution: service.attribution,
+            opacity: 0.7
+          });
+        } else if (service.type === 'featureserver' || service.type === 'mapserver') {
+          if (typeof L.esri === 'undefined') {
+            setError('Esri Leaflet not loaded. Cannot display ArcGIS layers.');
+            return;
+          }
+          layer = L.esri.featureLayer({
+            url: service.url,
+            attribution: service.attribution,
+            minZoom: service.minZoom || 0,
+            style: () => ({ ...service.style, opacity: 0.7 }),
+            onEachFeature: (feature, layer) => {
+              if (feature.properties) {
+                let popupContent = '<div style="max-width: 250px;">';
+                Object.keys(feature.properties).forEach(key => {
+                  if (feature.properties[key] != null && key !== 'OBJECTID') {
+                    popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
+                  }
+                });
+                popupContent += '</div>';
+                layer.bindPopup(popupContent);
+              }
+            }
+          });
+        }
+
+        if (layer) {
+          layer.addTo(mapRef.current);
+          externalLayersRef.current[layerId] = layer;
+        }
+      }, []);
+
+      // Measurement functions
+      const startMeasurement = useCallback(() => {
+        if (!mapRef.current) return;
+
+        // Clear previous measurement
+        if (measurementLayerRef.current) {
+          measurementLayerRef.current.clearLayers();
+        } else {
+          measurementLayerRef.current = L.featureGroup().addTo(mapRef.current);
+        }
+
+        // Remove previous click handler
+        if (measurementClickHandlerRef.current) {
+          mapRef.current.off('click', measurementClickHandlerRef.current);
+        }
+
+        setMeasurementPoints([]);
+        setMeasurementResult(null);
+
+        const points = [];
+        const clickHandler = (e) => {
+          points.push(e.latlng);
+
+          // Add marker
+          L.circleMarker(e.latlng, {
+            radius: 5,
+            color: measurementMode === 'distance' ? '#3388ff' : '#f357a1',
+            fillColor: measurementMode === 'distance' ? '#3388ff' : '#f357a1',
+            fillOpacity: 1
+          }).addTo(measurementLayerRef.current);
+
+          if (measurementMode === 'distance' && points.length > 1) {
+            // Draw line
+            const polyline = L.polyline(points, {
+              color: '#3388ff',
+              weight: 3,
+              dashArray: '5, 10'
+            }).addTo(measurementLayerRef.current);
+
+            // Calculate distance
+            let total = 0;
+            for (let i = 0; i < points.length - 1; i++) {
+              total += points[i].distanceTo(points[i + 1]);
+            }
+
+            const km = total / 1000;
+            const miles = total / 1609.34;
+            const feet = total * 3.28084;
+
+            setMeasurementResult({
+              type: 'distance',
+              meters: total,
+              display: total < 1000 ? `${total.toFixed(2)} m` : `${km.toFixed(2)} km`,
+              imperial: miles < 1 ? `${feet.toFixed(2)} ft` : `${miles.toFixed(2)} mi`
+            });
+          } else if (measurementMode === 'area' && points.length > 2) {
+            // Draw polygon
+            const polygon = L.polygon(points, {
+              color: '#f357a1',
+              weight: 3,
+              fillOpacity: 0.2
+            }).addTo(measurementLayerRef.current);
+
+            // Calculate area
+            const R = 6378137;
+            const toRad = Math.PI / 180;
+            const coords = points.map(p => [p.lng, p.lat]);
+            let area = 0;
+
+            for (let i = 0; i < coords.length; i++) {
+              const p1 = coords[i];
+              const p2 = coords[(i + 1) % coords.length];
+              area += (p2[0] - p1[0]) * toRad * (2 + Math.sin(p1[1] * toRad) + Math.sin(p2[1] * toRad));
+            }
+
+            area = Math.abs(area * R * R / 2);
+            const sqKm = area / 1000000;
+            const acres = area * 0.000247105;
+            const sqFt = area * 10.7639;
+
+            setMeasurementResult({
+              type: 'area',
+              sqMeters: area,
+              display: area < 1000000 ? `${area.toFixed(2)} m²` : `${sqKm.toFixed(2)} km²`,
+              imperial: acres < 1 ? `${sqFt.toFixed(2)} ft²` : `${acres.toFixed(2)} acres`
+            });
+          }
+
+          setMeasurementPoints(points);
+        };
+
+        mapRef.current.on('click', clickHandler);
+        measurementClickHandlerRef.current = clickHandler;
+      }, [measurementMode]);
+
+      const clearMeasurements = useCallback(() => {
+        if (measurementLayerRef.current) {
+          measurementLayerRef.current.clearLayers();
+        }
+        if (measurementClickHandlerRef.current && mapRef.current) {
+          mapRef.current.off('click', measurementClickHandlerRef.current);
+          measurementClickHandlerRef.current = null;
+        }
+        setMeasurementPoints([]);
+        setMeasurementResult(null);
+      }, []);
+
+      // Search functions
+      const handleSearch = useCallback(async () => {
+        if (!searchQuery.trim()) return;
+
+        setSearchLoading(true);
+        setSearchResults([]);
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`
+          );
+          const results = await response.json();
+          setSearchResults(results);
+        } catch (error) {
+          console.error('Search error:', error);
+          setError('Search failed. Please try again.');
+        } finally {
+          setSearchLoading(false);
+        }
+      }, [searchQuery]);
+
+      const zoomToSearchResult = useCallback((lat, lon, name) => {
+        if (!mapRef.current) return;
+
+        // Clear previous marker
+        if (searchMarkerRef.current) {
+          mapRef.current.removeLayer(searchMarkerRef.current);
+        }
+
+        // Add new marker
+        searchMarkerRef.current = L.marker([lat, lon], {
+          icon: L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+          })
+        }).addTo(mapRef.current);
+
+        searchMarkerRef.current.bindPopup(`<b>${name}</b>`).openPopup();
+        mapRef.current.setView([lat, lon], 15, { animate: true });
+        setSearchResults([]);
+        setSearchQuery('');
+      }, []);
+
+      // Keyboard shortcuts
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+          switch (e.key.toLowerCase()) {
+            case 'r':
+              // Reset view
+              if (featureLayerRef.current && mapRef.current) {
+                const bounds = featureLayerRef.current.getBounds();
+                mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 });
+              }
+              break;
+            case 'c':
+              // Copy coordinates
+              if (mouseCoords) {
+                const coordString = `${mouseCoords.lat}, ${mouseCoords.lng}`;
+                navigator.clipboard.writeText(coordString);
+              }
+              break;
+            case 'escape':
+              // Clear measurements
+              clearMeasurements();
+              break;
+          }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+      }, [mouseCoords, clearMeasurements]);
+
+      // Handle display controls (scale, attribution)
+      useEffect(() => {
+        if (!mapRef.current) return;
+
+        const scaleControl = document.querySelector('.leaflet-control-scale');
+        const attributionControl = document.querySelector('.leaflet-control-attribution');
+
+        if (scaleControl) {
+          scaleControl.style.display = showScale ? 'block' : 'none';
+        }
+        if (attributionControl) {
+          attributionControl.style.display = showAttribution ? 'block' : 'none';
+        }
+      }, [showScale, showAttribution]);
+
+      // Load saved presets from localStorage on mount
+      useEffect(() => {
+        try {
+          const saved = localStorage.getItem('mapPresets');
+          if (saved) {
+            setSavedPresets(JSON.parse(saved));
+          }
+        } catch (err) {
+          console.error('Failed to load presets:', err);
+        }
+      }, []);
+
+      // Preset functions
+      const getCurrentConfig = useCallback(() => {
+        return {
+          basemap: currentBasemap,
+          basemapOpacity,
+          hideBasemap,
+          colorScheme,
+          markerSize,
+          layerOpacity,
+          showLegend,
+          showScale,
+          showAttribution
+        };
+      }, [currentBasemap, basemapOpacity, hideBasemap, colorScheme, markerSize, layerOpacity, showLegend, showScale, showAttribution]);
+
+      const applyPreset = useCallback((config) => {
+        setCurrentBasemap(config.basemap);
+        setBasemapOpacity(config.basemapOpacity);
+        setHideBasemap(config.hideBasemap);
+        setColorScheme(config.colorScheme);
+        setMarkerSize(config.markerSize);
+        setLayerOpacity(config.layerOpacity);
+        setShowLegend(config.showLegend);
+        setShowScale(config.showScale);
+        setShowAttribution(config.showAttribution);
+      }, []);
+
+      const saveCurrentPreset = useCallback(() => {
+        if (!presetName.trim()) {
+          alert('Please enter a preset name');
+          return;
+        }
+
+        const newPreset = {
+          id: `custom_${Date.now()}`,
+          name: presetName,
+          description: 'Custom saved preset',
+          config: getCurrentConfig(),
+          custom: true
+        };
+
+        const updated = [...savedPresets, newPreset];
+        setSavedPresets(updated);
+        localStorage.setItem('mapPresets', JSON.stringify(updated));
+        setPresetName('');
+        alert(`Preset "${presetName}" saved!`);
+      }, [presetName, savedPresets, getCurrentConfig]);
+
+      const deletePreset = useCallback((presetId) => {
+        if (confirm('Delete this preset?')) {
+          const updated = savedPresets.filter(p => p.id !== presetId);
+          setSavedPresets(updated);
+          localStorage.setItem('mapPresets', JSON.stringify(updated));
+        }
+      }, [savedPresets]);
+
+      // Advanced tools functions
+      const toggleFullscreen = useCallback(() => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+          setIsFullscreen(true);
+        } else {
+          document.exitFullscreen();
+          setIsFullscreen(false);
+        }
+      }, []);
+
+      const exportMapAsPNG = useCallback(() => {
+        if (!mapRef.current) return;
+
+        alert('To export the map as PNG, please take a screenshot using your browser or OS:\n\n' +
+              'Windows: Win + Shift + S\n' +
+              'Mac: Cmd + Shift + 4\n' +
+              'Chrome: Right-click → Save image as');
+      }, []);
+
+      return React.createElement('div', { className: 'page-container' },
+        React.createElement(HeaderComp, {
+          title: 'Project Map Viewer',
+          subtitle: 'Visualize geo-referenced project features from Supabase'
+        }),
+
+        React.createElement('div', { className: 'content' },
+          // Toolbar
+          React.createElement('div', { className: 'toolbar' },
+            React.createElement('select', {
+              className: 'input',
+              value: selectedProject,
+              onChange: (e) => setSelectedProject(e.target.value),
+              disabled: loading
+            },
+              React.createElement('option', { value: '' }, 'Select Project...'),
+              projects.map(p =>
+                React.createElement('option', {
+                  key: p.project_id,
+                  value: p.project_id
+                }, `${p.project_number || '—'} — ${p.project_name}`)
+              )
+            ),
+
+            selectedProject && React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: handleZoomToExtent,
+              disabled: !featureLayerRef.current
+            },
+              React.createElement('i', { className: 'fas fa-compress-arrows-alt' }),
+              ' Zoom to Extent'
+            ),
+
+            selectedProject && React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: exportMapAsPNG,
+              title: 'Export map as image'
+            },
+              React.createElement('i', { className: 'fas fa-camera' }),
+              ' Export'
+            ),
+
+            React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: toggleFullscreen,
+              title: isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+            },
+              React.createElement('i', { className: isFullscreen ? 'fas fa-compress' : 'fas fa-expand' })
+            ),
+
+            loading && React.createElement('span', { style: { color: '#60a5fa' } },
+              React.createElement('i', { className: 'fas fa-spinner fa-spin' }),
+              ' Loading...'
+            )
+          ),
+
+          // Tabs
+          selectedProject && React.createElement('div', { className: 'tabs' },
+            React.createElement('button', {
+              className: `tab ${activeTab === 'layers' ? 'active' : ''}`,
+              onClick: () => setActiveTab('layers')
+            }, React.createElement('i', { className: 'fas fa-layer-group' }), ' Layers'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'basemap' ? 'active' : ''}`,
+              onClick: () => setActiveTab('basemap')
+            }, React.createElement('i', { className: 'fas fa-map' }), ' Basemap'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'external' ? 'active' : ''}`,
+              onClick: () => setActiveTab('external')
+            }, React.createElement('i', { className: 'fas fa-globe' }), ' External'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'settings' ? 'active' : ''}`,
+              onClick: () => setActiveTab('settings')
+            }, React.createElement('i', { className: 'fas fa-cog' }), ' Settings'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'measure' ? 'active' : ''}`,
+              onClick: () => setActiveTab('measure')
+            }, React.createElement('i', { className: 'fas fa-ruler' }), ' Measure'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'search' ? 'active' : ''}`,
+              onClick: () => setActiveTab('search')
+            }, React.createElement('i', { className: 'fas fa-search' }), ' Search'),
+            React.createElement('button', {
+              className: `tab ${activeTab === 'presets' ? 'active' : ''}`,
+              onClick: () => setActiveTab('presets')
+            }, React.createElement('i', { className: 'fas fa-save' }), ' Presets')
+          ),
+
+          // Project Layers Tab
+          activeTab === 'layers' && featureTypes.length > 0 && React.createElement('div', { className: 'layer-controls' },
+            React.createElement('span', { style: { color: 'var(--color-text-secondary)', fontSize: '0.875rem' } }, 'Layers:'),
+            featureTypes.map(ft =>
+              React.createElement('label', {
+                key: ft.feature_type,
+                className: `layer-toggle ${visibleLayers.has(ft.feature_type) ? 'active' : ''}`,
+                title: `${ft.count} features`
+              },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: visibleLayers.has(ft.feature_type),
+                  onChange: () => toggleLayer(ft.feature_type)
+                }),
+                React.createElement('span', {
+                  style: {
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    backgroundColor: (FEATURE_STYLES[ft.feature_type] || FEATURE_STYLES.DEFAULT).color,
+                    marginRight: '4px'
+                  }
+                }),
+                React.createElement('span', null,
+                  FEATURE_STYLES[ft.feature_type]?.label || ft.feature_type,
+                  ` (${ft.count})`
+                )
+              )
+            )
+          ),
+
+          // Basemap Tab
+          activeTab === 'basemap' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-map' }),
+              ' Basemap Options'
+            ),
+            React.createElement('div', { className: 'basemap-grid' },
+              Object.keys(BASEMAP_OPTIONS).map(basemapId =>
+                React.createElement('div', {
+                  key: basemapId,
+                  className: `basemap-option ${currentBasemap === basemapId ? 'active' : ''}`,
+                  onClick: () => setCurrentBasemap(basemapId),
+                  style: { backgroundImage: `url(${BASEMAP_OPTIONS[basemapId].thumbnail})` }
+                },
+                  React.createElement('div', { className: 'basemap-option-label' },
+                    BASEMAP_OPTIONS[basemapId].name
+                  )
+                )
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-adjust' }),
+                ' Basemap Opacity'
+              ),
+              React.createElement('div', { className: 'slider-container' },
+                React.createElement('input', {
+                  type: 'range',
+                  min: 0,
+                  max: 100,
+                  value: basemapOpacity,
+                  onChange: (e) => setBasemapOpacity(Number(e.target.value))
+                }),
+                React.createElement('span', null, `${basemapOpacity}%`)
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: hideBasemap,
+                  onChange: (e) => setHideBasemap(e.target.checked)
+                }),
+                React.createElement('span', null, 'Hide Basemap')
+              )
+            )
+          ),
+
+          // External Layers Tab
+          activeTab === 'external' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-server' }),
+              ' ArcGIS Services'
+            ),
+            React.createElement('div', null,
+              Object.keys(EXTERNAL_LAYER_SERVICES).map(layerId =>
+                React.createElement('div', { key: layerId, className: 'layer-item' },
+                  React.createElement('label', { className: 'checkbox-label' },
+                    React.createElement('input', {
+                      type: 'checkbox',
+                      checked: activeExternalLayers.has(layerId),
+                      onChange: () => toggleExternalLayer(layerId)
+                    }),
+                    React.createElement('span', null, EXTERNAL_LAYER_SERVICES[layerId].name)
+                  )
+                )
+              )
+            )
+          ),
+
+          // Settings Tab
+          activeTab === 'settings' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-palette' }),
+              ' Styling'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-swatchbook' }),
+                ' Color Scheme'
+              ),
+              React.createElement('select', {
+                className: 'form-select',
+                value: colorScheme,
+                onChange: (e) => setColorScheme(e.target.value)
+              },
+                React.createElement('option', { value: 'standard' }, 'Standard'),
+                React.createElement('option', { value: 'vibrant' }, 'Vibrant'),
+                React.createElement('option', { value: 'high_contrast' }, 'High Contrast'),
+                React.createElement('option', { value: 'colorblind_friendly' }, 'Colorblind Friendly')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-map-marker-alt' }),
+                ' Marker Size'
+              ),
+              React.createElement('select', {
+                className: 'form-select',
+                value: markerSize,
+                onChange: (e) => setMarkerSize(e.target.value)
+              },
+                React.createElement('option', { value: 'small' }, 'Small'),
+                React.createElement('option', { value: 'medium' }, 'Medium'),
+                React.createElement('option', { value: 'large' }, 'Large')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null,
+                React.createElement('i', { className: 'fas fa-adjust' }),
+                ' Layer Opacity'
+              ),
+              React.createElement('div', { className: 'slider-container' },
+                React.createElement('input', {
+                  type: 'range',
+                  min: 0,
+                  max: 100,
+                  value: layerOpacity,
+                  onChange: (e) => setLayerOpacity(Number(e.target.value))
+                }),
+                React.createElement('span', null, `${layerOpacity}%`)
+              )
+            ),
+            React.createElement('h3', { style: { marginTop: '20px' } },
+              React.createElement('i', { className: 'fas fa-eye' }),
+              ' Display Options'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showLegend,
+                  onChange: (e) => setShowLegend(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Legend')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showScale,
+                  onChange: (e) => setShowScale(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Scale Bar')
+              )
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', { className: 'checkbox-label' },
+                React.createElement('input', {
+                  type: 'checkbox',
+                  checked: showAttribution,
+                  onChange: (e) => setShowAttribution(e.target.checked)
+                }),
+                React.createElement('span', null, 'Show Attribution')
+              )
+            )
+          ),
+
+          // Measurement Tab
+          activeTab === 'measure' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-ruler' }),
+              ' Measurement Tools'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } },
+                React.createElement('button', {
+                  className: `btn-primary btn-sm ${measurementMode === 'distance' ? 'active' : ''}`,
+                  onClick: () => { setMeasurementMode('distance'); clearMeasurements(); },
+                  style: { flex: 1 }
+                }, React.createElement('i', { className: 'fas fa-ruler' }), ' Distance'),
+                React.createElement('button', {
+                  className: `btn-primary btn-sm ${measurementMode === 'area' ? 'active' : ''}`,
+                  onClick: () => { setMeasurementMode('area'); clearMeasurements(); },
+                  style: { flex: 1 }
+                }, React.createElement('i', { className: 'fas fa-draw-polygon' }), ' Area')
+              ),
+              React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+                React.createElement('button', {
+                  className: 'btn-primary btn-sm',
+                  onClick: startMeasurement,
+                  style: { flex: 1 }
+                }, React.createElement('i', { className: 'fas fa-play' }), ' Start'),
+                React.createElement('button', {
+                  className: 'btn-danger btn-sm',
+                  onClick: clearMeasurements,
+                  style: { flex: 1 }
+                }, React.createElement('i', { className: 'fas fa-trash' }), ' Clear')
+              )
+            ),
+            measurementResult && React.createElement('div', { className: 'measurement-result' },
+              React.createElement('div', { className: 'result-item' },
+                React.createElement('div', { className: 'result-label' },
+                  measurementResult.type === 'distance' ? 'Distance' : 'Area'
+                ),
+                React.createElement('div', { className: 'result-value' }, measurementResult.display)
+              ),
+              React.createElement('div', { className: 'result-item' },
+                React.createElement('div', { className: 'result-label' },
+                  measurementResult.type === 'distance' ? 'Imperial' : 'Imperial'
+                ),
+                React.createElement('div', { className: 'result-value' }, measurementResult.imperial)
+              )
+            ),
+            !measurementResult && React.createElement('p', { className: 'instruction' },
+              `Click on map to ${measurementMode === 'distance' ? 'measure distance' : 'draw area'}. Click multiple points to continue.`
+            )
+          ),
+
+          // Search Tab
+          activeTab === 'search' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-search' }),
+              ' Search Location'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('input', {
+                type: 'text',
+                value: searchQuery,
+                onChange: (e) => setSearchQuery(e.target.value),
+                onKeyPress: (e) => e.key === 'Enter' && handleSearch(),
+                placeholder: 'Search for a place...'
+              })
+            ),
+            React.createElement('button', {
+              className: 'btn-primary btn-sm',
+              onClick: handleSearch,
+              disabled: searchLoading || !searchQuery.trim(),
+              style: { width: '100%' }
+            },
+              searchLoading
+                ? React.createElement(React.Fragment, null,
+                    React.createElement('i', { className: 'fas fa-spinner fa-spin' }),
+                    ' Searching...'
+                  )
+                : React.createElement(React.Fragment, null,
+                    React.createElement('i', { className: 'fas fa-search' }),
+                    ' Search'
+                  )
+            ),
+            searchResults.length > 0 && React.createElement('div', { style: { marginTop: '12px' } },
+              searchResults.map((result, index) =>
+                React.createElement('div', {
+                  key: index,
+                  className: 'search-result-item',
+                  onClick: () => zoomToSearchResult(
+                    parseFloat(result.lat),
+                    parseFloat(result.lon),
+                    result.display_name.split(',')[0]
+                  )
+                },
+                  React.createElement('div', { className: 'search-result-name' },
+                    result.display_name.split(',')[0]
+                  ),
+                  React.createElement('div', { className: 'search-result-address' },
+                    result.display_name
+                  )
+                )
+              )
+            )
+          ),
+
+          // Presets Tab
+          activeTab === 'presets' && React.createElement('div', { className: 'control-panel' },
+            React.createElement('h3', null,
+              React.createElement('i', { className: 'fas fa-magic' }),
+              ' Quick Presets'
+            ),
+            React.createElement('div', { style: { display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' } },
+              DEFAULT_PRESETS.map(preset =>
+                React.createElement('div', {
+                  key: preset.id,
+                  className: 'layer-item',
+                  style: {
+                    cursor: 'pointer',
+                    padding: '12px',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    borderRadius: '8px'
+                  },
+                  onClick: () => applyPreset(preset.config)
+                },
+                  React.createElement('div', { style: { fontWeight: '600', color: '#60a5fa', marginBottom: '4px' } },
+                    preset.name
+                  ),
+                  React.createElement('div', { style: { fontSize: '0.8rem', color: 'var(--color-text-secondary)' } },
+                    preset.description
+                  )
+                )
+              )
+            ),
+            React.createElement('h3', { style: { marginTop: '24px' } },
+              React.createElement('i', { className: 'fas fa-save' }),
+              ' Save Current View'
+            ),
+            React.createElement('div', { className: 'control-group' },
+              React.createElement('label', null, 'Preset Name'),
+              React.createElement('input', {
+                type: 'text',
+                value: presetName,
+                onChange: (e) => setPresetName(e.target.value),
+                placeholder: 'My Custom View',
+                onKeyPress: (e) => e.key === 'Enter' && saveCurrentPreset()
+              })
+            ),
+            React.createElement('button', {
+              className: 'btn-primary btn-sm',
+              onClick: saveCurrentPreset,
+              style: { width: '100%' }
+            },
+              React.createElement('i', { className: 'fas fa-save' }),
+              ' Save Current Configuration'
+            ),
+            savedPresets.length > 0 && React.createElement(React.Fragment, null,
+              React.createElement('h3', { style: { marginTop: '24px' } },
+                React.createElement('i', { className: 'fas fa-star' }),
+                ' My Saved Presets'
+              ),
+              React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+                savedPresets.map(preset =>
+                  React.createElement('div', {
+                    key: preset.id,
+                    className: 'layer-item',
+                    style: { justifyContent: 'space-between' }
+                  },
+                    React.createElement('span', {
+                      style: { cursor: 'pointer', flex: 1 },
+                      onClick: () => applyPreset(preset.config)
+                    }, preset.name),
+                    React.createElement('button', {
+                      className: 'btn-danger btn-sm',
+                      onClick: () => deletePreset(preset.id),
+                      style: { padding: '4px 8px' }
+                    },
+                      React.createElement('i', { className: 'fas fa-trash' })
+                    )
+                  )
+                )
+              )
+            )
+          ),
+
+          // Error message
+          error && React.createElement('div', {
+            style: {
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fca5a5',
+              padding: '12px',
+              borderRadius: '8px',
+              marginTop: '12px'
+            }
+          },
+            React.createElement('i', { className: 'fas fa-exclamation-triangle' }),
+            ' ',
+            error
+          ),
+
+          // Map
+          React.createElement('div', { ref: mapEl, id: 'map', style: { position: 'relative' } },
+            // Legend overlay
+            showLegend && featureTypes.length > 0 && React.createElement('div', { className: 'legend-box' },
+              React.createElement('div', { className: 'legend-title' }, 'Legend'),
+              featureTypes.map(ft => {
+                const color = getFeatureColor(ft.feature_type);
+                return React.createElement('div', { key: ft.feature_type, className: 'legend-item' },
+                  React.createElement('div', {
+                    className: 'legend-color',
+                    style: { backgroundColor: color }
+                  }),
+                  React.createElement('span', null,
+                    FEATURE_STYLES[ft.feature_type]?.label || ft.feature_type
+                  )
+                );
+              })
+            )
+          ),
+
+          // Status bar
+          React.createElement('div', { className: 'status-bar' },
+            React.createElement('div', { className: 'status-item' },
+              React.createElement('i', { className: 'fas fa-layer-group' }),
+              ` ${featureCount} features loaded`
+            ),
+            mouseCoords && React.createElement('div', { className: 'coordinate-display' },
+              `Lat: ${mouseCoords.lat}, Lon: ${mouseCoords.lng}`
+            )
+          )
+        )
+      );
+    }
+
+    ReactDOM.render(
+      React.createElement(ProjectMap),
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
