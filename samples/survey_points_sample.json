@@ -1,0 +1,6 @@
+{
+  "project_id": "<project_id>",
+  "has_header": true,
+  "csv_text": "point_number,northing,easting,elevation,point_description\nCP1,2000000,6000000,100,Control Point 1\nTP101,2000025,6000050,101.2,Topo point 101\nTP102,2000050,6000100,100.8,Topo point 102\n"
+}
+

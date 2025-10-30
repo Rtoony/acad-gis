@@ -857,6 +857,35 @@ def list_vertical_elements(alignment_id: str) -> List[Dict]:
     """
     return execute_query(query, (alignment_id,))
 
+def list_alignment_pis(alignment_id: str) -> List[Dict]:
+    """Return alignment vertices as PI-like points with approximate stationing.
+    Uses ST_DumpPoints and ST_LineLocatePoint to compute station along the line.
+    """
+    query = """
+        WITH a AS (
+            SELECT station_start, geom
+            FROM alignments
+            WHERE alignment_id = %s
+        )
+        SELECT
+            (dp.path)[1] AS vertex_index,
+            (a.station_start + ST_Length(a.geom) * ST_LineLocatePoint(a.geom, dp.geom)) AS station,
+            ST_X(dp.geom) AS easting,
+            ST_Y(dp.geom) AS northing,
+            ST_Z(dp.geom) AS elevation,
+            ST_AsGeoJSON(dp.geom) AS geometry
+        FROM a, LATERAL ST_DumpPoints(a.geom) AS dp
+        ORDER BY vertex_index
+    """
+    rows = execute_query(query, (alignment_id,))
+    # Normalize numeric types
+    for r in rows:
+        r['station'] = _to_float(r.get('station'))
+        r['easting'] = _to_float(r.get('easting'))
+        r['northing'] = _to_float(r.get('northing'))
+        r['elevation'] = _to_float(r.get('elevation'))
+    return rows
+
 def list_bmps(project_id: Optional[str] = None) -> List[Dict]:
     where = ""
     params: List[Any] = []
@@ -1860,6 +1889,36 @@ def create_vertical_element(alignment_id: str, payload: Dict[str, Any]) -> str:
         )
     )
     return result['element_id']
+
+def update_horizontal_element(element_id: str, updates: Dict[str, Any]) -> bool:
+    assignments: List[str] = []
+    params: List[Any] = []
+    for field in ('type', 'start_station', 'end_station'):
+        if field in updates and updates[field] is not None:
+            assignments.append(f"{field} = %s")
+            params.append(updates[field])
+    if 'params' in updates and updates['params'] is not None:
+        assignments.append("params = %s")
+        params.append(_json_or_none(updates['params']))
+    return _execute_update('horizontal_elements', 'element_id', element_id, assignments, params)
+
+def delete_horizontal_element(element_id: str) -> None:
+    execute_query("DELETE FROM horizontal_elements WHERE element_id = %s", (element_id,), fetch=False)
+
+def update_vertical_element(element_id: str, updates: Dict[str, Any]) -> bool:
+    assignments: List[str] = []
+    params: List[Any] = []
+    for field in ('type', 'start_station', 'end_station'):
+        if field in updates and updates[field] is not None:
+            assignments.append(f"{field} = %s")
+            params.append(updates[field])
+    if 'params' in updates and updates['params'] is not None:
+        assignments.append("params = %s")
+        params.append(_json_or_none(updates['params']))
+    return _execute_update('vertical_elements', 'element_id', element_id, assignments, params)
+
+def delete_vertical_element(element_id: str) -> None:
+    execute_query("DELETE FROM vertical_elements WHERE element_id = %s", (element_id,), fetch=False)
 
 
 def get_bmp(bmp_id: str) -> Optional[Dict]:

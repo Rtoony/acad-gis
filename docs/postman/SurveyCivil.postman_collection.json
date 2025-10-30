@@ -1,0 +1,75 @@
+{
+  "info": {
+    "name": "Survey & Civil API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/health"}
+    },
+    {
+      "name": "Create Project",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"project_name\": \"Survey Civil Demo\"\n}"},
+        "url": "{{baseUrl}}/api/projects"
+      }
+    },
+    {
+      "name": "List Survey Points",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/survey-points?project_id={{project_id}}"}
+    },
+    {
+      "name": "Create Survey Point (GeoJSON)",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"point_number\": \"CP1\",\n  \"point_type\": \"Control\",\n  \"geometry\": {\n    \"geojson\": {\"type\": \"Point\", \"coordinates\": [6000000,2000000,100]},\n    \"srid\": 2226\n  }\n}"},
+        "url": "{{baseUrl}}/api/survey-points"
+      }
+    },
+    {
+      "name": "Create Utility Line",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"utility_type\": \"water\",\n  \"owner\": \"City\",\n  \"status\": \"existing\",\n  \"geometry\": {\n    \"geojson\": {\"type\": \"LineString\", \"coordinates\": [[6000000,2000000,100],[6000100,2000100,100]]},\n    \"srid\": 2226\n  }\n}"},
+        "url": "{{baseUrl}}/api/utility-lines"
+      }
+    },
+    {
+      "name": "Create Parcel",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"apn\": \"001-001-001\",\n  \"owner_name\": \"Acme Dev\",\n  \"situs_address\": \"123 Main St\",\n  \"geometry\": {\n    \"geojson\": {\"type\": \"Polygon\", \"coordinates\": [[[6000000,2000000,0],[6000200,2000000,0],[6000200,2000200,0],[6000000,2000200,0],[6000000,2000000,0]]]},\n    \"srid\": 2226\n  }\n}"},
+        "url": "{{baseUrl}}/api/parcels"
+      }
+    },
+    {
+      "name": "Create Alignment",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"project_id\": \"{{project_id}}\",\n  \"name\": \"Mainline\",\n  \"srid\": 2226,\n  \"station_start\": 10.0,\n  \"geom\": {\"type\":\"LineString\",\"coordinates\":[[6000000,2000000,100],[6000250,2000000,101],[6000500,2000100,102]]}\n}"},
+        "url": "{{baseUrl}}/api/alignments"
+      }
+    },
+    {
+      "name": "Alignment PIs",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/alignments/{{alignment_id}}/pis"}
+    },
+    {
+      "name": "Alignment Profile",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/alignments/{{alignment_id}}/profile"}
+    }
+  ],
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8000"},
+    {"key": "project_id", "value": ""},
+    {"key": "alignment_id", "value": ""}
+  ]
+}
+

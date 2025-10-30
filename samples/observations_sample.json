@@ -1,0 +1,6 @@
+{
+  "project_id": "<project_id>",
+  "has_header": true,
+  "csv_text": "session_id,station_point,backsight_point,target_point,observation_time,angle_dms,distance_ft,method\nS1,CP1,TP101,TP102,2025-01-15T09:00:00Z,90-00-00,50.12,Total Station\nS1,CP1,TP102,TP101,2025-01-15T09:05:00Z,180-00-00,51.05,Total Station\n"
+}
+

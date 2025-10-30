@@ -37,12 +37,14 @@ if __package__ in (None, ""):
     from dxf_exporter import DXFExporter  # type: ignore
     from validators.pipe_network import validate_pipe_network, Severity  # type: ignore
     from validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
+    from survey_api import router as survey_router  # type: ignore
 else:
     from . import database  # type: ignore
     from .import_dxf_georef import GeoreferencedDXFImporter  # type: ignore
     from .dxf_exporter import DXFExporter  # type: ignore
     from .validators.pipe_network import validate_pipe_network, Severity  # type: ignore
     from .validators.standards import DEFAULT_STANDARDS, STRICT_STANDARDS  # type: ignore
+    from .survey_api import router as survey_router  # type: ignore
 
 app = FastAPI(
     title="ACAD=GIS Enhanced API",
@@ -61,6 +63,11 @@ app.add_middleware(
 
 if 'gis_router' in globals() and gis_router is not None:
     app.include_router(gis_router)
+try:
+    # Mount Survey & Civil API routes
+    app.include_router(survey_router)
+except Exception as exc:  # pragma: no cover - optional in early environments
+    print("?? Survey router not available:", exc)
 
 
 @app.on_event("startup")
@@ -1517,6 +1524,47 @@ def list_vertical_elements(alignment_id: str):
 def create_vertical_element(alignment_id: str, payload: Dict[str, Any]):
     element_id = database.create_vertical_element(alignment_id, payload)
     return {"element_id": element_id}
+
+@app.get("/api/alignments/{alignment_id}/pis")
+def get_alignment_pis(alignment_id: str):
+    """Return vertices of the alignment geometry as PI-like points with stationing."""
+    try:
+        return database.list_alignment_pis(alignment_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get PIs: {str(e)}")
+
+@app.get("/api/alignments/{alignment_id}/profile")
+def get_alignment_profile(alignment_id: str):
+    """Return vertical profile elements for the alignment."""
+    try:
+        elements = database.list_vertical_elements(alignment_id)
+        return {"alignment_id": alignment_id, "elements": elements}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get profile: {str(e)}")
+
+@app.put("/api/horizontal-elements/{element_id}")
+def update_horizontal_element(element_id: str, payload: Dict[str, Any]):
+    updated = database.update_horizontal_element(element_id, payload)
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"element_id": element_id, "updated": True}
+
+@app.delete("/api/horizontal-elements/{element_id}")
+def delete_horizontal_element(element_id: str):
+    database.delete_horizontal_element(element_id)
+    return {"element_id": element_id, "deleted": True}
+
+@app.put("/api/vertical-elements/{element_id}")
+def update_vertical_element(element_id: str, payload: Dict[str, Any]):
+    updated = database.update_vertical_element(element_id, payload)
+    if not updated:
+        raise HTTPException(status_code=400, detail="No changes provided")
+    return {"element_id": element_id, "updated": True}
+
+@app.delete("/api/vertical-elements/{element_id}")
+def delete_vertical_element(element_id: str):
+    database.delete_vertical_element(element_id)
+    return {"element_id": element_id, "deleted": True}
 
 # BMPs
 @app.get("/api/bmps")

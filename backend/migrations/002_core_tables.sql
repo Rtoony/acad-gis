@@ -3,7 +3,6 @@
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- Projects
 CREATE TABLE IF NOT EXISTS projects (
@@ -28,7 +27,7 @@ CREATE TABLE IF NOT EXISTS drawings (
   description text,
   tags text[],
   metadata jsonb,
-  drawing_embedding vector(1536),
+  drawing_embedding double precision[],
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz
 );
@@ -42,7 +41,7 @@ CREATE TABLE IF NOT EXISTS layer_standards (
   color_rgb text,
   color_name text,
   display_order integer,
-  layer_embedding vector(1536)
+  layer_embedding double precision[]
 );
 
 -- Layers per drawing
@@ -74,7 +73,7 @@ CREATE TABLE IF NOT EXISTS block_definitions (
   tags text[],
   metadata jsonb,
   space_type text,
-  block_embedding vector(1536)
+  block_embedding double precision[]
 );
 
 -- Symbol placements
@@ -216,4 +215,3 @@ CREATE TABLE IF NOT EXISTS conflicts (
   suggestions text[]
 );
 CREATE INDEX IF NOT EXISTS idx_conflicts_location ON conflicts USING gist (location);
-

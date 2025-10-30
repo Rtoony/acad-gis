@@ -1,0 +1,89 @@
+# VSCode REST Client or IntelliJ HTTP Client compatible samples
+
+@base = http://localhost:8000
+
+### Health
+GET {{base}}/api/health
+
+### Create demo project
+POST {{base}}/api/projects
+Content-Type: application/json
+
+{
+  "project_name": "Survey Civil Demo"
+}
+
+### List projects
+GET {{base}}/api/projects
+
+### List survey points (replace)
+GET {{base}}/api/survey-points?project_id={{project_id}}
+
+### Create survey point (GeoJSON)
+POST {{base}}/api/survey-points
+Content-Type: application/json
+
+{
+  "project_id": "{{project_id}}",
+  "point_number": "CP1",
+  "point_type": "Control",
+  "geometry": {
+    "geojson": {"type": "Point", "coordinates": [6000000, 2000000, 100]},
+    "srid": 2226
+  }
+}
+
+### Create utility line
+POST {{base}}/api/utility-lines
+Content-Type: application/json
+
+{
+  "project_id": "{{project_id}}",
+  "utility_type": "water",
+  "owner": "City",
+  "status": "existing",
+  "geometry": {
+    "geojson": {"type": "LineString", "coordinates": [[6000000,2000000,100],[6000100,2000100,100]]},
+    "srid": 2226
+  }
+}
+
+### Create parcel
+POST {{base}}/api/parcels
+Content-Type: application/json
+
+{
+  "project_id": "{{project_id}}",
+  "apn": "001-001-001",
+  "owner_name": "Acme Dev",
+  "situs_address": "123 Main St",
+  "geometry": {
+    "geojson": {"type": "Polygon", "coordinates": [[[6000000,2000000,0],[6000200,2000000,0],[6000200,2000200,0],[6000000,2000200,0],[6000000,2000000,0]]]},
+    "srid": 2226
+  }
+}
+
+### Create alignment
+POST {{base}}/api/alignments
+Content-Type: application/json
+
+{
+  "project_id": "{{project_id}}",
+  "name": "Mainline",
+  "srid": 2226,
+  "station_start": 10.0,
+  "geom": {"type":"LineString","coordinates":[[6000000,2000000,100],[6000250,2000000,101],[6000500,2000100,102]]}
+}
+
+### Get alignment PIs
+GET {{base}}/api/alignments/{{alignment_id}}/pis
+
+### Create cross-section
+POST {{base}}/api/alignments/{{alignment_id}}/cross-sections
+Content-Type: application/json
+
+{
+  "station": 100.0,
+  "geometry": {"geojson": {"type":"LineString","coordinates":[[6000100,1999950,98],[6000100,2000050,102]]}, "srid": 2226}
+}
+
