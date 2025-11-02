@@ -230,15 +230,33 @@ def create_layer(
         if standard:
             layer_standard_id = standard['layer_standard_id']
     
+    # Check if layer already exists
+    existing = execute_single(
+        "SELECT layer_id FROM layers WHERE drawing_id = %s AND layer_name = %s",
+        (drawing_id, layer_name)
+    )
+
+    if existing:
+        # Update existing layer
+        execute_query(
+            """
+            UPDATE layers SET
+                color = %s,
+                linetype = %s,
+                lineweight = %s,
+                layer_standard_id = %s
+            WHERE layer_id = %s
+            """,
+            (color, linetype, lineweight, layer_standard_id, existing['layer_id']),
+            fetch=False
+        )
+        return existing['layer_id']
+
     query = """
         INSERT INTO layers (
             layer_id, drawing_id, layer_name, color, linetype, lineweight,
             is_plottable, is_locked, is_frozen, layer_standard_id
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (drawing_id, layer_name) DO UPDATE SET
-            color = EXCLUDED.color,
-            linetype = EXCLUDED.linetype,
-            lineweight = EXCLUDED.lineweight
         RETURNING layer_id
     """
     
@@ -695,6 +713,7 @@ def list_structures(network_id: Optional[str] = None, project_id: Optional[str] 
             s.type,
             s.rim_elev,
             s.sump_depth,
+            s.invert_elev,
             ST_AsGeoJSON(s.geom) AS geom,
             s.metadata
         FROM structures s
@@ -993,7 +1012,7 @@ def list_sheet_notes(project_id: Optional[str] = None) -> List[Dict]:
     where = ""
     params: List[Any] = []
     if project_id:
-        where = "WHERE project_id = %s"
+        where = "WHERE sn.project_id = %s"
         params.append(project_id)
 
     query = f"""
@@ -1052,7 +1071,7 @@ def delete_pipe_network(network_id: str) -> None:
 def get_structure(structure_id: str) -> Optional[Dict]:
     return execute_single(
         """
-        SELECT structure_id, project_id, network_id, type, rim_elev, sump_depth,
+        SELECT structure_id, project_id, network_id, type, rim_elev, sump_depth, invert_elev,
                ST_AsGeoJSON(geom) AS geom, metadata
         FROM structures
         WHERE structure_id = %s
@@ -1067,6 +1086,7 @@ def create_structure(
     structure_type: Optional[str],
     rim_elev: Optional[float],
     sump_depth: Optional[float],
+    invert_elev: Optional[float] = None,
     geom: Any = None,
     srid: Optional[int] = None,
     metadata: Optional[Dict[str, Any]] = None
@@ -1075,13 +1095,13 @@ def create_structure(
         project_id = _derive_project_id_from_network(network_id)
 
     geom_clause, geom_params = _build_geom_clause(geom, srid)
-    params: List[Any] = [project_id, network_id, structure_type, rim_elev, sump_depth]
+    params: List[Any] = [project_id, network_id, structure_type, rim_elev, sump_depth, invert_elev]
     params.extend(geom_params)
     params.append(_json_or_none(metadata))
 
     query = f"""
-        INSERT INTO structures (project_id, network_id, type, rim_elev, sump_depth, geom, metadata)
-        VALUES (%s, %s, %s, %s, %s, {geom_clause}, %s)
+        INSERT INTO structures (project_id, network_id, type, rim_elev, sump_depth, invert_elev, geom, metadata)
+        VALUES (%s, %s, %s, %s, %s, %s, {geom_clause}, %s)
         RETURNING structure_id
     """
     result = execute_single(query, tuple(params))
@@ -1092,7 +1112,7 @@ def update_structure(structure_id: str, updates: Dict[str, Any]) -> bool:
     assignments: List[str] = []
     params: List[Any] = []
 
-    for field in ('project_id', 'network_id', 'type', 'rim_elev', 'sump_depth'):
+    for field in ('project_id', 'network_id', 'type', 'rim_elev', 'sump_depth', 'invert_elev'):
         if field in updates and updates[field] is not None:
             assignments.append(f"{field} = %s")
             params.append(updates[field])
@@ -1617,9 +1637,12 @@ def generate_sheet_index(set_id: str) -> Dict:
 def get_project_details(project_id: str) -> Optional[Dict]:
     return execute_single(
         """
-        SELECT project_id, project_address, city, state, zip_code, county, engineer_of_record,
-               engineer_license, jurisdiction, permit_number, parcel_number, project_area_acres,
-               project_description, owner_name, owner_contact, created_at, updated_at
+        SELECT project_id, street_address, city, state, zip_code, county, apn,
+               project_engineer, project_manager, design_lead,
+               client_contact_name, client_contact_email, client_contact_phone,
+               jurisdiction, jurisdiction_type, permit_number, project_type, project_phase,
+               tb_format_type, tb_format_size, design_start_date, design_completion_date,
+               construction_start_date, special_requirements, notes, created_at, updated_at
         FROM project_details
         WHERE project_id = %s
         """,
@@ -1631,18 +1654,25 @@ def create_project_details(payload: Dict[str, Any]) -> Dict:
     row = execute_single(
         """
         INSERT INTO project_details (
-            project_id, project_address, city, state, zip_code, county, engineer_of_record,
-            engineer_license, jurisdiction, permit_number, parcel_number, project_area_acres,
-            project_description, owner_name, owner_contact
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            project_id, street_address, city, state, zip_code, county, apn,
+            project_engineer, project_manager, design_lead,
+            client_contact_name, client_contact_email, client_contact_phone,
+            jurisdiction, jurisdiction_type, permit_number, project_type, project_phase,
+            tb_format_type, tb_format_size, design_start_date, design_completion_date,
+            construction_start_date, special_requirements, notes
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING *
         """,
         (
-            payload['project_id'], payload.get('project_address'), payload.get('city'), payload.get('state'),
-            payload.get('zip_code'), payload.get('county'), payload.get('engineer_of_record'),
-            payload.get('engineer_license'), payload.get('jurisdiction'), payload.get('permit_number'),
-            payload.get('parcel_number'), payload.get('project_area_acres'), payload.get('project_description'),
-            payload.get('owner_name'), payload.get('owner_contact')
+            payload['project_id'], payload.get('street_address'), payload.get('city'), payload.get('state'),
+            payload.get('zip_code'), payload.get('county'), payload.get('apn'),
+            payload.get('project_engineer'), payload.get('project_manager'), payload.get('design_lead'),
+            payload.get('client_contact_name'), payload.get('client_contact_email'), payload.get('client_contact_phone'),
+            payload.get('jurisdiction'), payload.get('jurisdiction_type'), payload.get('permit_number'),
+            payload.get('project_type'), payload.get('project_phase'),
+            payload.get('tb_format_type'), payload.get('tb_format_size'),
+            payload.get('design_start_date'), payload.get('design_completion_date'),
+            payload.get('construction_start_date'), payload.get('special_requirements'), payload.get('notes')
         )
     )
     return row or {}
@@ -1652,8 +1682,12 @@ def update_project_details(project_id: str, updates: Dict[str, Any]) -> Dict:
     fields = []
     params: List[Any] = []
     for key in (
-        'project_address','city','state','zip_code','county','engineer_of_record','engineer_license',
-        'jurisdiction','permit_number','parcel_number','project_area_acres','project_description','owner_name','owner_contact'
+        'street_address', 'city', 'state', 'zip_code', 'county', 'apn',
+        'project_engineer', 'project_manager', 'design_lead',
+        'client_contact_name', 'client_contact_email', 'client_contact_phone',
+        'jurisdiction', 'jurisdiction_type', 'permit_number', 'project_type', 'project_phase',
+        'tb_format_type', 'tb_format_size', 'design_start_date', 'design_completion_date',
+        'construction_start_date', 'special_requirements', 'notes'
     ):
         if key in updates:
             fields.append(f"{key} = %s")

@@ -100,7 +100,7 @@ def ensure_note(project_id: str, title: str, category: str, text: str,
         database.execute_query(
             """
             UPDATE sheet_notes
-            SET category = %s, text = %s, tags = %s::jsonb, is_standard = %s, updated_at = CURRENT_TIMESTAMP
+            SET category = %s, text = %s, tags = %s, is_standard = %s, updated_at = CURRENT_TIMESTAMP
             WHERE note_id = %s
             """,
             (category, text, (tags or []), is_standard, existing['note_id']),
@@ -110,7 +110,7 @@ def ensure_note(project_id: str, title: str, category: str, text: str,
         database.execute_query(
             """
             INSERT INTO sheet_notes (project_id, title, category, text, tags, is_standard)
-            VALUES (%s, %s, %s, %s, %s::jsonb, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (project_id, title, category, text, (tags or []), is_standard),
             fetch=False
