@@ -983,7 +983,7 @@ def list_sheet_notes(project_id: Optional[str] = None) -> List[Dict]:
     where = ""
     params: List[Any] = []
     if project_id:
-        where = "WHERE project_id = %s"
+        where = "WHERE sn.project_id = %s"
         params.append(project_id)
 
     query = f"""
